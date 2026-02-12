@@ -1,0 +1,8 @@
+[General]
+LogLevel = "INFO"
+
+[Filesystem]
+ClashOfClansShortcutFilepath = "C:/Users/<Username>/AppData/Roaming/Microsoft/Windows/Start Menu/Programs/Google Play Games/Clash of Clans.lnk"
+GooglePlayGamesBetaFilepath = "E:/Google/Play Games/Bootstrapper.exe"
+GooglePlayGamesBetaProcessName = "Service.exe"
+GooglePlayGamesBetaProcessDirectoryName = "E:/Google/Play Games/current/service/Service.exe"

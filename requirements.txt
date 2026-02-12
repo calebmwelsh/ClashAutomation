@@ -1,0 +1,6 @@
+inference==0.29.1
+inference_gpu==0.27.0
+keyboard==0.13.5
+psutil==6.1.0
+pywin32==306
+toml==0.10.2

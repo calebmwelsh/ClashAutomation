@@ -1,0 +1,191 @@
+[Resolution]
+reference_width = 1728
+reference_height = 1080
+
+[HomeBaseGeneral]
+special_troop_event = 1
+special_troop_event_rgb = [ [ 57, 124, 165,],]
+special_troop_drop = [ [ 0.221065, 0.275926,],]
+special_troop_counts = [ 10,]
+
+[General]
+switch_account = [ [ 0.963542, 0.77037,], [ 0.657986, 0.208333,], [ 0.869213, 0.618519,],]
+update_button = [ [ 0.582755, 0.40463,],]
+account_switch_y_offset = 0.101852
+
+[HomeBaseStaticClickPositions]
+reset_select = [ [ 0.99, 0.5,],]
+return_home_refocus = [ [ 0.500579, 0.797222,],]
+reset_camera = [ [ 0.05787, 0.919444,], [ 0.156829, 0.694444,], [ 0.842593, 0.818519,], [ 0.064815, 0.789815,],]
+go_home = [ [ 0.49537, 0.862037,], [ 0.49537, 0.808333,], [ 0.969329, 0.437963,],]
+find_next = [ [ 0.908565, 0.766667,],]
+start_attack = [ [ 0.072338, 0.867593,], [ 0.156829, 0.694444,], [ 0.842593, 0.818519,],]
+train_army_button = [ [ 0.03588, 0.768519,],]
+end_battle = [ [ 0.064236, 0.791667,],]
+build_upgrade = [ [ 0.473958, 0.052778,], [ 0.547454, 0.496296,], [ 0.541667, 0.806481,], [ 0.586227, 0.798148,], [ 0.586227, 0.798148,], [ 0.726852, 0.864815,],]
+research_upgrade = [ [ 0.344907, 0.051852,], [ 0.457176, 0.268519,], [ 0.699074, 0.84537,],]
+pet_start_pos = [ 0.202546, 0.764815,]
+pet_step_x = 0.184028
+pet_drag_coords = [ 0.855903, 0.780556, 0.291088, 0.784259,]
+exit_pet_upgrade = [ [ 0.925347, 0.078704,],]
+confirm_pet_upgrade = [ [ 0.710069, 0.862037,],]
+launch_raid_start = [ [ 0.308449, 0.976852,], [ 0.946759, 0.905556,],]
+apprentice_research = [ [ 0.453704, 0.799074,], [ 0.877894, 0.410185,], [ 0.328125, 0.636111,], [ 0.493056, 0.75463,],]
+apprentice_builder = [ [ 0.546875, 0.802778,], [ 0.877894, 0.410185,], [ 0.328125, 0.636111,], [ 0.493056, 0.75463,],]
+apprentice_alchemist = [ [ 0.636574, 0.80463,], [ 0.877894, 0.410185,], [ 0.328125, 0.636111,], [ 0.493056, 0.75463,],]
+switch_builder_base = [ [ 0.243056, 0.836111,],]
+activate_super_troop = [ [ 0.178241, 0.249074,], [ 0.239005, 0.564815,], [ 0.712384, 0.87963,], [ 0.480324, 0.715741,], [ 0.237269, 0.574074,], [ 0.699074, 0.87037,], [ 0.60706, 0.615741,],]
+
+[BuilderBaseStaticClickPositions]
+reset_select = [ [ 0.498264, 0.773148,], [ 0.975694, 0.458333,], [ 0.975694, 0.458333,],]
+reset_camera = [ [ 0.06713, 0.896296,], [ 0.715856, 0.653704,], [ 0.141204, 0.903704,], [ 0.987847, 0.526852,], [ 0.06713, 0.735185,], [ 0.594329, 0.623148,], [ 0.500579, 0.857407,],]
+go_home = [ [ 0.49537, 0.862037,], [ 0.49537, 0.808333,], [ 0.969329, 0.437963,],]
+start_attack = [ [ 0.06713, 0.896296,], [ 0.715856, 0.653704,],]
+train_army_button = [ [ 0.03588, 0.768519,],]
+build_upgrade = [ [ 0.537616, 0.047222,], [ 0.530671, 0.405556,], [ 0.541667, 0.806481,], [ 0.586227, 0.798148,], [ 0.586227, 0.798148,], [ 0.502894, 0.805556,], [ 0.788194, 0.894444,],]
+research_upgrade = [ [ 0.413773, 0.053704,], [ 0.395255, 0.496296,], [ 0.78588, 0.873148,],]
+defense_reward = [ [ 0.758681, 0.836111,], [ 0.871528, 0.103704,],]
+switch_base_drag = [ 0.524884, 0.375926, 0.040509, 0.700926,]
+switch_base_click = [ [ 0.362847, 0.356481,], [ 0.609375, 0.19537,], [ 0.634838, 0.212037,], [ 0.666088, 0.237037,], [ 0.686921, 0.251852,], [ 0.719907, 0.294444,], [ 0.788194, 0.372222,], [ 0.815394, 0.403704,], [ 0.837384, 0.431481,], [ 0.856481, 0.45,], [ 0.880208, 0.485185,], [ 0.895255, 0.506481,],]
+
+[HomeBaseCoordinates]
+check_base_load_pos = [ 0.965856, 0.137963,]
+return_home_region = [ 0.456019, 0.822222, 0.546875, 0.901852,]
+reference_place_pos = [ 0.086806, 0.478704,]
+add_wall_button_pos = [ 0.499421, 0.790741,]
+remove_wall_button_pos = [ 0.320602, 0.794444,]
+wall_confirm_button_pos = [ 0.589699, 0.615741,]
+wall_gold_region = [ 0.554398, 0.748148, 0.616319, 0.768519,]
+wall_elixir_region = [ 0.646991, 0.748148, 0.706019, 0.768519,]
+wall_scroll_drag_coords = [ 0.514468, 0.535185, 0.512153, 0.216667,]
+wall_upgrade_search_region = [ 0.36, 0.12, 0.66, 0.64,]
+resource_upgrade_pos_1 = [ 0.58912, 0.789815,]
+resource_upgrade_pos_2 = [ 0.682292, 0.801852,]
+max_wall_message_region = [ 0.244792, 0.264815, 0.36169, 0.305556,]
+default_pet_button_pos = [ 0.546296, 0.807407,]
+ranked_mode_offset = [ 0.173611, 0.0,]
+special_troop_select_dummy = [ 0.0, 0.87963,]
+
+[BuilderBaseCoordinates]
+gold_warning_exit_click = [ 0.981481, 0.365741,]
+builder_upgrade_step_y = 0.038889
+research_upgrade_step_y = 0.027778
+builder_upgrade_step_y_small = 0.018519
+builder_base_exit_click = [ 0.981481, 0.365741,]
+return_home_region = [ 0.456019, 0.812963, 0.546875, 0.892593,]
+
+[RecordAttackCoordinates]
+base_load_check_pos = [ 0.969907, 0.09537,]
+special_troop_check_pos = [ 0.115741, 0.916667,]
+
+[Colors]
+white_clouds_rgb = [ 254, 254, 254,]
+base_load_target_rgb = [ 184, 34, 235,]
+wall_check_red_rgb = [ 203, 171, 159,]
+wall_check_white_small_1_rgb = [ 193, 194, 181,]
+wall_check_white_large_1_rgb = [ 207, 208, 192,]
+wall_check_white_small_2_rgb = [ 192, 192, 181,]
+wall_check_white_large_2_rgb = [ 207, 206, 191,]
+max_wall_msg_red_rgb = [ 143, 78, 41,]
+max_wall_msg_green_rgb = [ 124, 131, 68,]
+return_home_avg_rgb = [ 173, 204, 119,]
+check_color_target_1_rgb = [ 203, 171, 159,]
+check_color_target_2_rgb = [ 204, 200, 189,]
+
+[ObjectDetectionCoordinates]
+base_determination_check_pos = [ 0.965856, 0.137963,]
+resource_collection_regions_gold = [ 0.04456, 0.111111, 0.127315, 0.148148,]
+resource_collection_regions_elixir = [ 0.04456, 0.157407, 0.127315, 0.194444,]
+resource_collection_regions_dark = [ 0.04456, 0.199074, 0.127315, 0.236111,]
+builders_roi_region = [ 0.491898, 0.032407, 0.538194, 0.064815,]
+goblin_builder_region = [ 0.457176, 0.032407, 0.477431, 0.064815,]
+hero_upgrade_check_regions = [ [ 0.10706, 0.675926, 0.173611, 0.703704,], [ 0.282407, 0.675926, 0.350116, 0.703704,], [ 0.464699, 0.675926, 0.52662, 0.703704,], [ 0.625, 0.675926, 0.717593, 0.703704,], [ 0.815972, 0.675926, 0.882523, 0.703704,],]
+info_button_regions = [ [ 0.19213, 0.787037, 0.197917, 0.796296,], [ 0.215278, 0.787037, 0.221065, 0.796296,], [ 0.260417, 0.787037, 0.266204, 0.796296,], [ 0.305556, 0.787037, 0.311343, 0.796296,], [ 0.353009, 0.787037, 0.358796, 0.796296,], [ 0.396991, 0.787037, 0.402778, 0.796296,], [ 0.442708, 0.787037, 0.448495, 0.796296,],]
+research_available_region = [ 0.379051, 0.032407, 0.422454, 0.064815,]
+goblin_researcher_region = [ 0.338542, 0.032407, 0.353009, 0.064815,]
+pet_upgrade_available_region = [ 0.679977, 0.814815, 0.763889, 0.847222,]
+pet_max_level_region = [ 0.353009, 0.268519, 0.648148, 0.305556,]
+pet_upgrade_in_progress_regions = [ [ 0.729167, 0.324074, 0.83912, 0.351852,], [ 0.734954, 0.217593, 0.844907, 0.25,],]
+attack_button_region = [ 0.538194, 0.87037, 0.627894, 0.939815,]
+heroes_available_regions = [ [ 0.111111, 0.310185, 0.11169, 0.311111,], [ 0.197917, 0.310185, 0.198495, 0.311111,], [ 0.284722, 0.310185, 0.285301, 0.311111,], [ 0.371528, 0.310185, 0.372106, 0.311111,],]
+builder_base_builders_region = [ 0.558449, 0.030556, 0.598958, 0.062963,]
+builder_base_research_region = [ 0.441551, 0.030556, 0.480324, 0.062963,]
+builder_base_hero_region = [ 0.111111, 0.310185, 0.11169, 0.311111,]
+upgrade_button_offsets = [ 0.086806, 0.280556, 0.263889, 0.430556, 0.352431,]
+gold_warning_check_region = [ 0.328704, 0.130556, 0.684028, 0.217593,]
+[[ObjectDetectionCoordinates.apprentice_regions_map]]
+name = "research"
+region = [ 0.422454, 0.833333, 0.486111, 0.861111,]
+
+[[ObjectDetectionCoordinates.apprentice_regions_map]]
+name = "builder"
+region = [ 0.509259, 0.833333, 0.578704, 0.861111,]
+
+[[ObjectDetectionCoordinates.apprentice_regions_map]]
+name = "alchemist"
+region = [ 0.601852, 0.833333, 0.671296, 0.861111,]
+
+[[ObjectDetectionCoordinates.home_resources_check_regions_map]]
+type = "gold"
+region = [ 0.811921, 0.053704, 0.814815, 0.058333,]
+
+[[ObjectDetectionCoordinates.home_resources_check_regions_map]]
+type = "elixir"
+region = [ 0.811921, 0.134259, 0.814815, 0.138889,]
+
+[[ObjectDetectionCoordinates.home_resources_check_regions_map]]
+type = "dark"
+region = [ 0.862269, 0.212963, 0.865162, 0.217593,]
+
+[[ObjectDetectionCoordinates.builder_resources_regions_map]]
+type = "gold"
+region = [ 0.811921, 0.053704, 0.814815, 0.058333,]
+
+[[ObjectDetectionCoordinates.builder_resources_regions_map]]
+type = "elixir"
+region = [ 0.811921, 0.134259, 0.814815, 0.138889,]
+
+[TileDetection]
+target_w = 0.06366
+target_h = 0.12963
+min_w = 0.05787
+max_w = 0.11574
+min_h = 0.12037
+max_h = 0.23148
+min_y_pos = 0.83333
+
+[ObjectDetectionColors]
+builder_base_bgr_targets = [ [ 247, 43, 121,], [ 224, 39, 108,],]
+home_base_bgr_targets = [ [ 213, 34, 171,], [ 187, 34, 151,], [ 164, 30, 132,],]
+goblin_builder_bgr = [ 69, 173, 167,]
+goblin_researcher_bgr = [ 69, 167, 166,]
+pet_upgrade_target_bgr = [ 144, 198, 182,]
+pet_max_level_target_bgr = [ 80, 86, 123,]
+pet_upgrade_in_progress_bgr = [ 117, 175, 147,]
+apprentice_target_rgb = [ 163, 166, 133,]
+hero_unavailable_target_grey = [ [ 126, 126, 126,], [ 67, 67, 67,], [ 186, 181, 171,],]
+hero_unavailable_target_blue = [ 65, 88, 134,]
+upgrade_button_gold_rgb_targets = [ [ 255, 234, 61,],]
+upgrade_button_purple_rgb_targets = [ [ 254, 60, 173,], [ 184, 67, 255,],]
+gold_warning_target_bgr = [ 61, 234, 255,]
+base_determination_tolerance = 20
+goblin_builder_tolerance = 30
+goblin_researcher_tolerance = 30
+pet_upgrade_available_tolerance = 20
+pet_max_level_tolerance = 15
+pet_upgrade_in_progress_tolerance = 20
+apprentice_status_tolerance = 20
+hero_unavailable_tolerance = 10
+upgrade_button_tolerance = 30
+gold_warning_tolerance = 40
+check_color_tolerance_primary = 30
+check_color_tolerance_secondary = 20
+
+[ObjectDetectionRanges]
+hero_upgrade_valid_rgb_range = [ [ 155, 185, 105,], [ 200, 225, 165,],]
+info_button_hero_hall_rgb_range = [ [ 100, 80, 70,], [ 120, 100, 90,],]
+info_button_blue_rgb_range = [ [ 50, 110, 155,], [ 90, 150, 210,],]
+resource_gold_max_rgb_range = [ [ 180, 150, 0,], [ 240, 200, 100,],]
+resource_elixir_max_rgb_range = [ [ 120, 0, 120,], [ 255, 80, 255,],]
+builder_resource_elixir_max_rgb_range = [ [ 90, 45, 155,], [ 130, 90, 200,],]
+resource_dark_max_rgb_range = [ [ 20, 0, 40,], [ 50, 20, 70,],]

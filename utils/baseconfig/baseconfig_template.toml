@@ -1,0 +1,28 @@
+[General]
+name = "Alt 1"
+
+[HomeBaseGeneral]
+THL = 12
+ENEMY_GOLD_THRESHOLD = 0
+ENEMY_ELIXIR_THRESHOLD = 0
+ENEMY_DARK_ELIXIR_THRESHOLD = 0
+
+
+[HomeBaseAttacks]
+main_attack = [ [], [], [],]
+auto_lose =[ [ [ 237, 997,], [ 149, 528,], [ 135, 855,], [ 1045, 664,],], [ ], [ ]]
+
+[HomeBaseDynamicClickPositions]
+resource_collection = [ ]
+pet_building = [ ]
+apprentice_building = [ ]
+
+
+[BuilderBaseGeneral]
+BHL = 8
+
+[BuilderBaseAttacks]
+main_attack = [ ]
+
+[BuilderBaseDynamicClickPositions]
+resource_collection = [ ]
