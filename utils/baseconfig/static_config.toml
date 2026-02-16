@@ -72,7 +72,7 @@ builder_upgrade_step_y = 0.038889
 research_upgrade_step_y = 0.027778
 builder_upgrade_step_y_small = 0.018519
 builder_base_exit_click = [ 0.981481, 0.365741,]
-return_home_region = [ 0.456019, 0.812963, 0.546875, 0.892593,]
+return_home_region = [ 0.456019, 0.803704, 0.546875, 0.883334,]
 
 [RecordAttackCoordinates]
 base_load_check_pos = [ 0.969907, 0.09537,]

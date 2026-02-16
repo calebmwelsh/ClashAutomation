@@ -443,6 +443,9 @@ if config.get("General") and config["General"].get("LogLevel"):
     try:
         # Re-setting the level on the global logger
         logger.setLevel(new_level)
+        for handler in logger.handlers:
+            handler.setLevel(new_level)
+            
         # We don't need to re-import Logger here as it's not used, just logger.setLevel
         logger.debug(f"Logger level set to {new_level} from config.")
     except Exception as e:

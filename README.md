@@ -39,7 +39,11 @@ The system uses a percentage-based coordinate system with a reference target of 
     pip install -r requirements.txt
     ```
 3.  **Initial Configuration**:
-    - Open `config.toml` (created from `utils/.config.template.toml` on first run) and update the filesystem paths.
+    - Create a `config.toml` file by copying the template:
+      ```bash
+      copy config.template.toml config.toml
+      ```
+    - Open `config.toml` and update the filesystem paths to match your installation.
 
 ### ⚙️ Account Configuration
 
