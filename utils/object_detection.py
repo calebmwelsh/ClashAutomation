@@ -374,34 +374,49 @@ def detect_heroes_available(image_path):
     img_cv = VisionUtils.load_image(image_path)
     regions = config["ObjectDetectionCoordinates"]["heroes_available_regions"]
     target_grey = config["ObjectDetectionColors"]["hero_unavailable_target_grey"]
-    if isinstance(target_grey[0], int):
-        target_grey = [target_grey] # Handle legacy single color case
-        
-    target_unavailable = tuple(config["ObjectDetectionColors"]["hero_unavailable_target_blue"])
+    target_purple = config["ObjectDetectionColors"].get("hero_available_target_purple", [])
     
+    # Handle single color legacy cases if necessary (though config is list of lists)
+    if target_grey and isinstance(target_grey[0], int): target_grey = [target_grey]
+    if target_purple and isinstance(target_purple[0], int): target_purple = [target_purple]
+
     annotated_img = img_cv.copy()
     available = 0
     
+    # Tolerance values
+    tolerance_grey = config["ObjectDetectionColors"].get("hero_unavailable_tolerance", 15)
+    tolerance_purple = config["ObjectDetectionColors"].get("hero_available_tolerance", 25)
+
     for i, region in enumerate(regions):
         b, g, r = VisionUtils.get_average_color(img_cv, region)
-        avg = (b, g, r)
+        avg_rgb = (r, g, b)
         VisionUtils.draw_region(annotated_img, region, (255, 0, 255))
         
         logger.info(f"[Hero Check #{i+1}] Region {region} | RGB: ({r}, {g}, {b})")
 
-        is_grey = False
-        tolerance = config["ObjectDetectionColors"].get("hero_unavailable_tolerance", 10)
-        for grey_target in target_grey:
-             if VisionUtils.is_color_close(avg, tuple(grey_target), tolerance):
-                 is_grey = True
-                 break
+        is_available = False
+        is_unavailable = False
 
-        if is_grey:
-            pass # upgrading
-        elif VisionUtils.is_color_close(avg, target_unavailable, tolerance):
-            pass # unavailable
-        else:
+        # Check for Available (Purple)
+        for purple_target in target_purple:
+            if VisionUtils.is_color_close(avg_rgb, tuple(purple_target), tolerance_purple):
+                is_available = True
+                break
+        
+        # Check for Unavailable (Grey) if not already found to be available
+        if not is_available:
+            for grey_target in target_grey:
+                if VisionUtils.is_color_close(avg_rgb, tuple(grey_target), tolerance_grey):
+                    is_unavailable = True
+                    break
+
+        if is_available:
             available += 1
+            logger.debug(f"Hero #{i+1}: Available (Match: Purple)")
+        elif is_unavailable:
+            logger.debug(f"Hero #{i+1}: Unavailable (Match: Grey)")
+        else:
+            logger.debug(f"Hero #{i+1}: Unavailable (No Match - Defaulting to unavailable)")
             
     VisionUtils.save_annotated_image(annotated_img, image_path, "_heroes_annotated.png")
     return available

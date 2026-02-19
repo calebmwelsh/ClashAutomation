@@ -750,7 +750,7 @@ class HomeBaseActions(BaseActions):
         # delay for the attack to complete
         if not army_key == 'auto_lose':
             # Dynamic Wait for Battle End
-            max_duration = 150
+            max_duration = 170
             
             self.logger.info(f"Waiting for battle to end (Max {max_duration}s)...")
             start_wait = time.time()
