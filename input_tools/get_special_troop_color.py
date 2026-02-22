@@ -73,6 +73,45 @@ def main():
         # Logging for sync verification
         logger.info(f"Using tile center for color sampling: ({x}, {y})")
 
+        # Extract troop count from top right of the tile
+        try:
+            from utils.vision_utils import VisionUtils
+            std_x, std_y, std_w, std_h = std_rect
+            # Top right corner of the tile
+            roi_x1 = std_x + int(std_w * 0.5)
+            roi_y1 = std_y
+            roi_x2 = std_x + std_w
+            roi_y2 = std_y + int(std_h * 0.25)
+            count_roi = (roi_x1, roi_y1, roi_x2, roi_y2)
+            
+            # Draw region for debugging
+            cv2.rectangle(img, (roi_x1, roi_y1), (roi_x2, roi_y2), (255, 0, 0), 2)
+            
+            # Save a debug snippet of just the count ROI to verify the area
+            count_snippet_path = screenshot_path.replace(".png", "_count_roi.png")
+            roi_img = img[roi_y1:roi_y2, roi_x1:roi_x2]
+            
+            # Upscale the ROI by 4x for better OCR recognition
+            roi_img_up = cv2.resize(roi_img, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+            cv2.imwrite(count_snippet_path, roi_img_up)
+            logger.info(f"Saved count ROI debug image to: {count_snippet_path}")
+            
+            import pytesseract
+            text = pytesseract.image_to_string(roi_img_up, config='--psm 7 -c tessedit_char_whitelist=x0123456789')
+            numbers = VisionUtils.extract_numbers(text)
+            logger.info(f"Detected Special Troop Text: {repr(text.strip())}")
+            logger.info(f"Detected Special Troop Count: {numbers}")
+            
+            troop_count = None
+            if numbers:
+                troop_count = int(numbers[0])
+                logger.info(f"Detected Special Troop Count: {troop_count}")
+            else:
+                logger.warning("Failed to detect Special Troop Count from tile.")
+        except Exception as e:
+            logger.error(f"Error extracting troop count: {e}")
+            troop_count = None
+
     else:
         # Fallback: Try to use a scaled fallback based on Resolution
         h_img, w_img = img.shape[:2]
@@ -108,10 +147,20 @@ def main():
                 # Update the RGB values
                 config_data["HomeBaseGeneral"]["special_troop_event_rgb"] = [new_rgb]
                 
+                # Update special troop counts if detected
+                if 'troop_count' in locals() and troop_count is not None:
+                    counts = config_data["HomeBaseGeneral"].get("special_troop_counts", [0])
+                    if not isinstance(counts, list):
+                        counts = [counts]
+                    counts[0] = troop_count
+                    config_data["HomeBaseGeneral"]["special_troop_counts"] = counts
+                
                 with open(static_config_path, "w") as f:
                     toml.dump(config_data, f)
                 
                 logger.info(f"Successfully updated 'special_troop_event_rgb' in {static_config_path} with {new_rgb}")
+                if 'troop_count' in locals() and troop_count is not None:
+                    logger.info(f"Successfully updated 'special_troop_counts' with {counts}")
             else:
                 logger.error(f"Could not find static_config.toml at {static_config_path}")
         except Exception as e:

@@ -1000,8 +1000,6 @@ class HomeBaseActions(BaseActions):
             screenshot_path = self.manage_screenshot_storage('hero_upgrade_loc')
             self.window_controller.capture_minimized_window_screenshot(screenshot_path)
             results = detect_hero_upgrade(screenshot_path)
-            # Filter for only Hero 1 (index 0)
-            results = [r for r in results if r['index'] == 0]
         return results
         
     def start_builder_upgrade(self):
@@ -1025,8 +1023,9 @@ class HomeBaseActions(BaseActions):
             self.logger.debug(f"Upgrade button results: {results}")
             # if in resource square, get location of resource square
             if results:
-                # get location of resource square
-                location = results[0]['pos'][0], results[0]['pos'][1]
+                # get location of resource square (center of the region)
+                x1, y1, x2, y2 = results[0]['pos']
+                location = (x1 + x2) // 2, (y1 + y2) // 2
                 self.logger.debug(f"Upgrade button location: {location}")
                 # selected upgrade and confirm
                 self.window_controller.execute_clicks(location)

@@ -169,7 +169,7 @@ def main():
                     available_heros = base.homebase_actions.check_heros()
                 # upgrade walls
                 logger.info("Upgrading walls...")
-                base.homebase_actions.upgrade_walls()
+                # base.homebase_actions.upgrade_walls()
                 # get max resources through attacking and builder upgrades
                 logger.info("Starting attack loop...")
                 base.homebase_actions.main_attack_loop(available_heros, ranked_mode, fill_storage)
