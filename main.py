@@ -57,7 +57,7 @@ def main():
             wc = GameWindowController(window_title, logger)
             logger.debug(f"Window found ({wc.hwnd}). Assuming game is ready.")
             if check_for_update(wc):
-                wc.execute_clicks([update_button_position])
+                wc.execute_clicks(update_button_position)
                 time.sleep(180)
             return wc
         except Exception:
@@ -86,14 +86,12 @@ def main():
         wc = GameWindowController(window_title, logger)
         
         if check_for_update(wc):
-             wc.execute_clicks([update_button_position])
+             wc.execute_clicks(update_button_position)
              logger.info("Update clicked. Waiting 180s...")
              time.sleep(180)
         return wc
     # load game
     window_controller = load_game()
-    
-    
     
     """ ------------------------ Automate Game -------------------------- """   
 

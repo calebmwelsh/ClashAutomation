@@ -137,7 +137,7 @@ class HomeBaseActions(BaseActions):
         self.reset_camera_positions.pop(-1)
         
         self.window_controller.execute_clicks(self.reset_camera_positions)
-        time.sleep(7)
+        self.wait_for_base_load()
         self.window_controller.execute_clicks(end_pos)
         time.sleep(4)
 
