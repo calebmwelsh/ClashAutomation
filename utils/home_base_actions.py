@@ -2,10 +2,10 @@ import copy
 import glob
 import os
 import shutil
+import sys
 import time
 from datetime import datetime
 
-import cv2
 import toml
 
 from utils.base_actions import BaseActions
@@ -314,53 +314,13 @@ class HomeBaseActions(BaseActions):
                     self.logger.debug(f"Super Troop Config: {num_super} active. determining position (Start vs End).")
                     
                     # DETERMINING POSITION:
-                    try:
-                        temp_img = cv2.imread(debug_screen_path)
-                        if temp_img is not None:
-                            check_x = int(cx)
-                            check_y = int(cy)
-                            
-                            self.logger.debug(f"Checking for Super Troop at First Tile: ({check_x}, {check_y})")
-
-                            if 0 <= check_y < temp_img.shape[0] and 0 <= check_x < temp_img.shape[1]:
-                                b, g, r = temp_img[check_y, check_x]
-                                # Match against special_troop_event_rgb from Config
-                                st_rgb_list = self.config["HomeBaseGeneral"].get("special_troop_event_rgb", [])
-
-                                matched = False
-                                for ref_rgb in st_rgb_list:
-                                    if abs(r - ref_rgb[0]) < 40 and abs(g - ref_rgb[1]) < 40 and abs(b - ref_rgb[2]) < 40:
-                                        matched = True
-                                        break
-                                if matched:
-                                    
-                                    # Save debug image of the check
-                                    try:
-                                        if self.logger.isEnabledFor(10):
-                                            cv2.circle(temp_img, (check_x, check_y), 5, (0, 0, 255), 2)
-                                            debug_st_path = debug_screen_path.replace('.png', '_debug_st_check.png')
-                                            cv2.imwrite(debug_st_path, temp_img)
-                                            self.logger.debug(f"Saved Super Troop Check debug image to {debug_st_path}")
-                                    except Exception as e:
-                                        self.logger.error(f"Failed to save ST debug img: {e}")
-
-                                    is_special_start = True
-                                    self.logger.debug(f"Super Troop detected at Start (Pixel Match at {check_x},{check_y}). Detected RGB: {r}, {g}, {b}")
-                                else:
-                                    # Save debug image even on failure
-                                    try:
-                                        if self.logger.isEnabledFor(10):
-                                            cv2.circle(temp_img, (check_x, check_y), 5, (255, 0, 0), 2) # Blue for fail
-                                            debug_st_path = debug_screen_path.replace('.png', '_debug_st_check.png')
-                                            cv2.imwrite(debug_st_path, temp_img)
-                                            self.logger.debug(f"Saved Super Troop Check debug image to {debug_st_path}")
-                                    except: pass
-
-                                    self.logger.debug(f"Super Troop NOT detected at Start (Pixel {r},{g},{b}). Did not match any of {st_rgb_list}.")
-                            else:
-                                self.logger.warning("Super Troop check out of bounds.")
-                    except Exception as e:
-                        self.logger.error(f"Super Troop detection error: {e}")
+                    is_special_start = detect_super_troop_at_pixel(
+                        debug_screen_path,
+                        cx,
+                        cy,
+                        self.config["HomeBaseGeneral"].get("special_troop_event_rgb", []),
+                        self.logger
+                    )
 
 
                     # INJECTION LOGIC
@@ -541,56 +501,7 @@ class HomeBaseActions(BaseActions):
             
             
             # --- VISUALIZATION of the Final Plan ---
-            try:
-                if os.path.exists(debug_screen_path):
-                    debug_img = cv2.imread(debug_screen_path)
-                    
-                    # Colors for phases: 0=Troops(Blue), 1=CC(Yellow), 2=Heroes(Green), 3=Spells(Red)
-                    # BGR Format
-                    phase_colors = [
-                        (255, 0, 0),    # Blue
-                        (0, 255, 255),  # Yellow
-                        (0, 255, 0),    # Green
-                        (0, 0, 255),    # Red
-                        (255, 0, 255)   # Magenta (Extra)
-                    ]
-                    
-                    global_counter = 1
-                    
-                    # Iterate explicitly by phase to assign colors
-                    for p_idx, p_list in enumerate(army_positions_copy):
-                        # Extract selects for this specific phase
-                        phase_selects = []
-                        def extract_phase_selects(obj):
-                            if isinstance(obj, (list, tuple)):
-                                if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                                    if obj[1] > 900: phase_selects.append(obj)
-                                else:
-                                    for item in obj: extract_phase_selects(item)
-                            elif isinstance(obj, list):
-                                for item in obj: extract_phase_selects(item)
-                        extract_phase_selects(p_list)
-                        
-                        self.logger.debug(f"Phase {p_idx} detected count: {len(phase_selects)}")
-
-                        # Pick color
-                        color = phase_colors[min(p_idx, len(phase_colors)-1)]
-                        
-                        for (fx, fy) in phase_selects:
-                            # Draw box using detected W/H
-                            bx = int(fx - w/2)
-                            by = int(fy - h/2)
-                             
-                            cv2.rectangle(debug_img, (bx, by), (bx+w, by+h), color, 2)
-                            cv2.putText(debug_img, str(global_counter), (bx, by+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
-                            global_counter += 1
-                    
-                    if self.logger.isEnabledFor(10):
-                        debug_inferred_path = debug_screen_path.replace('.png', '_inferred_army_plan.png')
-                        cv2.imwrite(debug_inferred_path, debug_img)
-                        self.logger.debug(f"Saved Inferred Army Plan to {debug_inferred_path}")
-            except Exception as e:
-                self.logger.error(f"Debug viz failed: {e}")
+            save_inferred_army_plan_visualization(debug_screen_path, army_positions_copy, w, h, self.logger)
             # -----------------------------------------------
             
         except Exception as e:
@@ -1118,7 +1029,29 @@ class HomeBaseActions(BaseActions):
     def start_pet_upgrade(self):
         self.reset_select()
         time.sleep(1)
+        
         # Execute clicks to get to the pet building
+        # We want to ONLY click the pet building itself, not the old default button position
+        if len(self.pet_building_position) > 0:
+            # We take the first element (the building coordinate)
+            building_pos = self.pet_building_position[-1]
+            self.window_controller.execute_clicks([building_pos])
+        else:
+            self.logger.error("[Pet Test] No pet building position found.")
+            sys.exit(1)
+            
+        time.sleep(2) # Wait for the menu to appear
+
+        # Take a screenshot
+        screenshot_path = self.manage_screenshot_storage('pet_button_test')
+        self.window_controller.capture_minimized_window_screenshot(screenshot_path)
+        
+        test_lower_middle_ocr(screenshot_path, self.logger)
+            
+        self.logger.info("[Pet Test] Exiting script as requested for testing.")
+        exit(0)
+
+        # --- OLD LOGIC (Unreachable for now due to sys.exit) ---
         default_pet_button_position = self.hb_coords.get("default_pet_button_pos", [1088, 871])
         self.pet_building_position.append(default_pet_button_position)
         self.window_controller.execute_clicks(self.pet_building_position)

@@ -1,5 +1,6 @@
 import ctypes
 import os
+import sys
 import time
 from ctypes import wintypes
 from datetime import datetime
@@ -10,6 +11,7 @@ import win32gui
 import win32ui
 from PIL import Image, ImageGrab
 
+from utils.object_detection import gold_pass_trigger
 from utils.settings import logger
 
 # Setup Logging
@@ -142,7 +144,7 @@ class GameWindowController:
         :param delay: Delay in seconds between each click.
         :param verbose: If True, prints the coordinates being clicked.
         """
-        from utils.object_detection import gold_pass_trigger
+
 
         # print(f"clicked positions: {positions}")
         if len(positions) == 0:
@@ -161,7 +163,7 @@ class GameWindowController:
             if os.path.exists(check_path):
                 if gold_pass_trigger(check_path):
                     self.logger.critical("GOLD PASS TRIGGERED. EXITING NOW.")
-                    import sys
+
                     sys.exit(0)
                 # Cleanup temp image to save space? Optional.
                 # os.remove(check_path) 
@@ -207,10 +209,7 @@ class GameWindowController:
         Captures a screenshot of the window and returns a PIL Image object.
         Uses ctypes and PrintWindow with flag 0 for better compatibility with visible windows.
         """
-        import ctypes
 
-        import win32ui
-        from PIL import Image
         
         target_hwnd = self.child_hwnd if self.child_hwnd else self.hwnd
         
@@ -262,12 +261,7 @@ class GameWindowController:
         Saves the screenshot to output_file (default: data/screenshots/screenshot_TIMESTAMP.png) and returns a PIL Image object.
         If read_back is False, returns None instead of loading the image from disk (faster).
         """
-        import os
-        from datetime import datetime
 
-        import win32con
-        import win32gui
-        import win32ui
 
         # Set default directory
         # Use a 'misc_captures' subfolder for unclassified screenshots
@@ -280,6 +274,11 @@ class GameWindowController:
             output_file = os.path.join(save_dir, f'screenshot_{timestamp}.png')
         elif not os.path.isabs(output_file):
             output_file = os.path.join(output_file)
+            
+        # Ensure the directory for output_file always exists to prevent CreateFile errors
+        output_dir = os.path.dirname(os.path.abspath(output_file))
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
             
         target_hwnd = self.child_hwnd if self.child_hwnd else self.hwnd
         

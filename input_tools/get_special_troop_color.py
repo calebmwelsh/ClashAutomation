@@ -7,9 +7,13 @@ import cv2
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import pytesseract
+import toml
+
 from utils.game_window_controller import GameWindowController
 from utils.object_detection import detect_first_army_tile
-from utils.settings import logger
+from utils.settings import config, logger, static_config_path
+from utils.vision_utils import VisionUtils
 
 
 def main():
@@ -24,8 +28,6 @@ def main():
         return
 
     # Load Config (already loaded and scaled in utils.settings)
-    from utils.settings import config
-    
     start_attack_positions = config.get("HomeBaseStaticClickPositions", {}).get("start_attack", [])
 
     if not start_attack_positions:
@@ -75,7 +77,6 @@ def main():
 
         # Extract troop count from top right of the tile
         try:
-            from utils.vision_utils import VisionUtils
             std_x, std_y, std_w, std_h = std_rect
             # Top right corner of the tile
             roi_x1 = std_x + int(std_w * 0.5)
@@ -96,7 +97,6 @@ def main():
             cv2.imwrite(count_snippet_path, roi_img_up)
             logger.info(f"Saved count ROI debug image to: {count_snippet_path}")
             
-            import pytesseract
             text = pytesseract.image_to_string(roi_img_up, config='--psm 7 -c tessedit_char_whitelist=x0123456789')
             numbers = VisionUtils.extract_numbers(text)
             logger.info(f"Detected Special Troop Text: {repr(text.strip())}")
@@ -133,10 +133,6 @@ def main():
         
         # Automatic Config Update
         try:
-            import toml
-
-            from utils.settings import static_config_path
-            
             if os.path.exists(static_config_path):
                 config_data = toml.load(static_config_path)
                 

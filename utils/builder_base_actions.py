@@ -3,7 +3,6 @@ import os
 import time
 from datetime import datetime
 
-import cv2
 import toml
 
 from utils.base_actions import BaseActions

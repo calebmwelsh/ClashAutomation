@@ -6,6 +6,8 @@ import numpy as np
 import pytesseract
 from PIL import Image
 
+from utils.settings import logger
+
 
 class VisionUtils:
     @staticmethod
@@ -17,7 +19,7 @@ class VisionUtils:
     @staticmethod
     def save_annotated_image(image, original_path, suffix, force_save=True):
         """Saves the annotated image for debugging."""
-        from utils.settings import logger
+
         if not force_save and not logger.isEnabledFor(10):
              return
         image_path_split = original_path.split("\\")

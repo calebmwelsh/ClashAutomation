@@ -983,3 +983,101 @@ def gold_pass_trigger(image_path):
         return True
         
     return False
+
+def test_lower_middle_ocr(image_path, logger_instance=None):
+    log = logger_instance if logger_instance else logger
+    
+    img_cv = VisionUtils.load_image(image_path)
+    if img_cv is not None:
+        h, w = img_cv.shape[:2]
+        crop_y1, crop_y2 = int(h * 0.7), h
+        crop_x1, crop_x2 = int(w * 0.25), int(w * 0.75)
+        cropped = img_cv[crop_y1:crop_y2, crop_x1:crop_x2]
+        
+        crop_path = image_path.replace('.png', '_crop.png')
+        cv2.imwrite(crop_path, cropped)
+        
+        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
+        text = pytesseract.image_to_string(gray, config='--oem 3 --psm 6')
+        log.info(f"[Pet Test] OCR Result on lower-middle screen:\n{text}")
+        return text
+    else:
+        log.error("[Pet Test] Failed to load screenshot.")
+        return None
+
+def detect_super_troop_at_pixel(image_path, cx, cy, st_rgb_list, logger_instance=None):
+    log = logger_instance if logger_instance else logger
+    try:
+        temp_img = VisionUtils.load_image(image_path)
+        if temp_img is not None:
+            check_x, check_y = int(cx), int(cy)
+            log.debug(f"Checking for Super Troop at First Tile: ({check_x}, {check_y})")
+
+            if 0 <= check_y < temp_img.shape[0] and 0 <= check_x < temp_img.shape[1]:
+                b, g, r = temp_img[check_y, check_x]
+                matched = False
+                for ref_rgb in st_rgb_list:
+                    if abs(r - ref_rgb[0]) < 40 and abs(g - ref_rgb[1]) < 40 and abs(b - ref_rgb[2]) < 40:
+                        matched = True
+                        break
+                        
+                # Debug logging + imaging
+                try:
+                    if log.isEnabledFor(10):  # DEBUG
+                        color = (0, 0, 255) if matched else (255, 0, 0)
+                        cv2.circle(temp_img, (check_x, check_y), 5, color, 2)
+                        debug_st_path = image_path.replace('.png', '_debug_st_check.png')
+                        cv2.imwrite(debug_st_path, temp_img)
+                        log.debug(f"Saved Super Troop Check debug image to {debug_st_path}")
+                except Exception as e:
+                    log.error(f"Failed to save ST debug img: {e}")
+
+                if matched:
+                    log.debug(f"Super Troop detected at Start (Pixel Match at {check_x},{check_y}). Detected RGB: {r}, {g}, {b}")
+                    return True
+                else:
+                    log.debug(f"Super Troop NOT detected at Start (Pixel {r},{g},{b}). Did not match any of {st_rgb_list}.")
+                    return False
+            else:
+                log.warning("Super Troop check out of bounds.")
+    except Exception as e:
+        log.error(f"Super Troop detection error: {e}")
+    return False
+
+def save_inferred_army_plan_visualization(image_path, army_positions_copy, w, h, logger_instance=None):
+    log = logger_instance if logger_instance else logger
+    try:
+        if os.path.exists(image_path):
+            debug_img = cv2.imread(image_path)
+            if debug_img is None: return
+            
+            phase_colors = [(255, 0, 0), (0, 255, 255), (0, 255, 0), (0, 0, 255), (255, 0, 255)]
+            global_counter = 1
+            
+            for p_idx, p_list in enumerate(army_positions_copy):
+                phase_selects = []
+                def extract_phase_selects(obj):
+                    if isinstance(obj, (list, tuple)):
+                        if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
+                            if obj[1] > 900: phase_selects.append(obj)
+                        else:
+                            for item in obj: extract_phase_selects(item)
+                    elif isinstance(obj, list):
+                        for item in obj: extract_phase_selects(item)
+                extract_phase_selects(p_list)
+                
+                log.debug(f"Phase {p_idx} detected count: {len(phase_selects)}")
+                color = phase_colors[min(p_idx, len(phase_colors)-1)]
+                
+                for (fx, fy) in phase_selects:
+                    bx, by = int(fx - w/2), int(fy - h/2)
+                    cv2.rectangle(debug_img, (bx, by), (bx + int(w), by + int(h)), color, 2)
+                    cv2.putText(debug_img, str(global_counter), (bx, by+20), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,0,255), 2)
+                    global_counter += 1
+            
+            if log.isEnabledFor(10):
+                debug_inferred_path = image_path.replace('.png', '_inferred_army_plan.png')
+                cv2.imwrite(debug_inferred_path, debug_img)
+                log.debug(f"Saved Inferred Army Plan to {debug_inferred_path}")
+    except Exception as e:
+        log.error(f"Debug viz failed: {e}")

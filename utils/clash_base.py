@@ -4,6 +4,8 @@ from datetime import datetime
 import toml
 from screeninfo import get_monitors
 
+import utils.settings as settings
+
 from .builder_base_actions import BuilderBaseActions
 from .home_base_actions import HomeBaseActions
 from .object_detection import *
@@ -37,7 +39,6 @@ class ClashBase:
     def load_config(self, path):
         # Load a default template and deep-merge with the specific base config so
         # static click positions only need to live in one place.
-        import utils.settings as settings
         defaults = {}
         try:
             # Use the already loaded and scaled config from settings as the base
