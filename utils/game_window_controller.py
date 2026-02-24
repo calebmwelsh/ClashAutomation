@@ -270,7 +270,7 @@ class GameWindowController:
             os.makedirs(save_dir)
         # Set default filename if not provided
         if output_file is None:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
             output_file = os.path.join(save_dir, f'screenshot_{timestamp}.png')
         elif not os.path.isabs(output_file):
             output_file = os.path.join(output_file)

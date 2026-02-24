@@ -50,7 +50,7 @@ class BaseActions:
         Returns the new screenshot path.
         """
         start_dt = datetime.now()
-        timestamp = start_dt.strftime('%Y%m%d_%H%M%S')
+        timestamp = start_dt.strftime('%Y%m%d_%H%M%S_%f')
         
         # Create subfolder path: data/screenshots/{base_name}
         dir_path = os.path.join('data', 'screenshots', base_name)

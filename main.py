@@ -184,6 +184,7 @@ def main():
             logger.info("Checking for pet upgrade...")
             if base.homebase_actions.thl >= 14:
                 base.homebase_actions.start_pet_upgrade()
+            
 
 
             """ ------------------------ Builder Base -------------------------- """

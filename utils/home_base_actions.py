@@ -137,6 +137,7 @@ class HomeBaseActions(BaseActions):
         self.reset_camera_positions.pop(-1)
         
         self.window_controller.execute_clicks(self.reset_camera_positions)
+        time.sleep(1.5)
         self.wait_for_base_load()
         self.window_controller.execute_clicks(end_pos)
         time.sleep(4)
@@ -185,6 +186,7 @@ class HomeBaseActions(BaseActions):
         check_pos = self.hb_coords.get("check_base_load_pos", [1669, 149])
         
         while (time.time() - start_time) < timeout:
+            time.sleep(0.5)
             screenshot_path = self.manage_screenshot_storage('base_load_check')
             # Using capture_minimized_window_screenshot returns PIL Image, also saves file
             img = self.window_controller.capture_minimized_window_screenshot(screenshot_path)
@@ -1042,19 +1044,22 @@ class HomeBaseActions(BaseActions):
             
         time.sleep(2) # Wait for the menu to appear
 
-        # Take a screenshot
-        screenshot_path = self.manage_screenshot_storage('pet_button_test')
+        # Take a screenshot to find the "Pets" button in the menu
+        screenshot_path = self.manage_screenshot_storage('pet_button_ocr')
         self.window_controller.capture_minimized_window_screenshot(screenshot_path)
         
-        test_lower_middle_ocr(screenshot_path, self.logger)
-            
-        self.logger.info("[Pet Test] Exiting script as requested for testing.")
-        exit(0)
+        from utils.object_detection import detect_pet_button_with_mask
+        pet_button_pos = detect_pet_button_with_mask(screenshot_path, self.logger)
+        
+        if pet_button_pos:
+            self.window_controller.execute_clicks([pet_button_pos])
+            time.sleep(2)
+        else:
+            self.logger.warning("[Pet] Could not find 'Pets' button via OCR. Falling back to default.")
+            default_pet_button_position = self.hb_coords.get("default_pet_button_pos", [1088, 871])
+            self.window_controller.execute_clicks([default_pet_button_position])
+            time.sleep(2)
 
-        # --- OLD LOGIC (Unreachable for now due to sys.exit) ---
-        default_pet_button_position = self.hb_coords.get("default_pet_button_pos", [1088, 871])
-        self.pet_building_position.append(default_pet_button_position)
-        self.window_controller.execute_clicks(self.pet_building_position)
         # get exit pet upgrade positions
         exit_pet_upgrade_positions = self.exit_pet_upgrade_positions
         # check if pet upgrade in progress

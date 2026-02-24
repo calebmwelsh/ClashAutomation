@@ -984,26 +984,116 @@ def gold_pass_trigger(image_path):
         
     return False
 
-def test_lower_middle_ocr(image_path, logger_instance=None):
+def detect_pet_button_with_mask(image_path, logger_instance=None):
+    from utils.settings import config, logger
     log = logger_instance if logger_instance else logger
     
     img_cv = VisionUtils.load_image(image_path)
-    if img_cv is not None:
-        h, w = img_cv.shape[:2]
-        crop_y1, crop_y2 = int(h * 0.7), h
-        crop_x1, crop_x2 = int(w * 0.25), int(w * 0.75)
-        cropped = img_cv[crop_y1:crop_y2, crop_x1:crop_x2]
-        
-        crop_path = image_path.replace('.png', '_crop.png')
-        cv2.imwrite(crop_path, cropped)
-        
-        gray = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
-        text = pytesseract.image_to_string(gray, config='--oem 3 --psm 6')
-        log.info(f"[Pet Test] OCR Result on lower-middle screen:\n{text}")
-        return text
-    else:
-        log.error("[Pet Test] Failed to load screenshot.")
+    if img_cv is None:
+        log.error("[Pet OCR] Failed to load screenshot.")
         return None
+
+    h, w = img_cv.shape[:2]
+    # Get region from config (already scaled to pixels by settings.py)
+    region = config["ObjectDetectionCoordinates"].get("pet_button_ocr_region", [240, 776, 1386, 930])
+    
+    x1, y1, x2, y2 = int(region[0]), int(region[1]), int(region[2]), int(region[3])
+    
+    # Clip to image bounds
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(w, x2), min(h, y2)
+    
+    roi = img_cv[y1:y2, x1:x2]
+    if roi.size == 0:
+        log.error("[Pet OCR] ROI is empty.")
+        return None
+    
+    # MASKING for white letters/numbers
+    # White is high intensity in all channels. Thresholding for high brightness.
+    # Convert to grayscale first for easier intensity thresholding
+    gray_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+    
+    # User requested "masking so that only white letters or white numbers are shown"
+    # Threshold at 200 (out of 255) to isolate bright white
+    _, mask = cv2.threshold(gray_roi, 200, 255, cv2.THRESH_BINARY)
+    
+    # OCR on the mask (black background, white text)
+    ocr_config = '--oem 3 --psm 6'
+    raw_text_masked = pytesseract.image_to_string(mask, config=ocr_config).strip()
+    log.info(f"[Pet OCR] Masked Pass - Raw detect: '{raw_text_masked}'")
+    
+    # Use image_to_data with SAME config to get bounding boxes
+    data = pytesseract.image_to_data(mask, output_type=pytesseract.Output.DICT, config=ocr_config)
+    
+    found_coords = None
+    all_found_texts = [w.strip() for w in data['text'] if w.strip()]
+    log.info(f"[Pet OCR] Masked Pass - Words: {all_found_texts}")
+    
+    for i in range(len(data['text'])):
+        word = data['text'][i].strip().lower()
+        if word:
+            # Check for 'pet' or common misreadings
+            if any(x in word for x in ["pet", "per", "pei", "pce", "pci"]):
+                center_rel_x = data['left'][i] + (data['width'][i] // 2)
+                center_rel_y = data['top'][i] + (data['height'][i] // 2)
+                found_coords = (x1 + center_rel_x, y1 + center_rel_y)
+                log.info(f"[Pet OCR] MATCH FOUND (Masked): '{word}' at global {found_coords} (conf: {data['conf'][i]})")
+                break
+    
+    # FALLBACK 1: If word-level matched nothing, but raw string has it
+    if not found_coords and any(x in raw_text_masked.lower() for x in ["pet", "per", "pei"]):
+        log.info("[Pet OCR] Word list empty but raw string contains target. Using ROI center.")
+        found_coords = (x1 + (x2-x1)//2, y1 + (y2-y1)//2)
+
+    # FALLBACK 2: Try Grayscale ROI if still nothing
+    if not found_coords:
+        log.debug("[Pet OCR] Attempting Grayscale Fallback...")
+        raw_text_gray = pytesseract.image_to_string(gray_roi, config=ocr_config).strip()
+        log.info(f"[Pet OCR] Gray Fallback - Raw detect: '{raw_text_gray}'")
+        
+        data_gray = pytesseract.image_to_data(gray_roi, output_type=pytesseract.Output.DICT, config=ocr_config)
+        all_gray_texts = [w.strip() for w in data_gray['text'] if w.strip()]
+        log.info(f"[Pet OCR] Gray Fallback - Words: {all_gray_texts}")
+        
+        for i in range(len(data_gray['text'])):
+            word = data_gray['text'][i].strip().lower()
+            if word:
+                if any(x in word for x in ["pet", "per", "pei", "pce", "pci"]):
+                    center_rel_x = data_gray['left'][i] + (data_gray['width'][i] // 2)
+                    center_rel_y = data_gray['top'][i] + (data_gray['height'][i] // 2)
+                    found_coords = (x1 + center_rel_x, y1 + center_rel_y)
+                    log.info(f"[Pet OCR] MATCH FOUND (Gray): '{word}' at global {found_coords}")
+                    break
+    
+    if found_coords:
+        log.info(f"[Pet OCR] FINAL DECISION: Clicking at {found_coords}")
+    else:
+        log.warning("[Pet OCR] No 'pet' keyword detected in any OCR pass.")
+        
+    # Save debug images
+    if log.isEnabledFor(10):
+        roi_path = image_path.replace('.png', '_pet_roi.png')
+        mask_path = image_path.replace('.png', '_pet_mask.png')
+        cv2.imwrite(roi_path, roi)
+        cv2.imwrite(mask_path, mask)
+        
+        # Add annotation to original image
+        annotated_img = img_cv.copy()
+        VisionUtils.draw_region(annotated_img, (x1, y1, x2, y2), color=(0, 255, 0), thickness=3)
+        cv2.putText(annotated_img, "Pet OCR Region", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+        
+        if found_coords:
+            cv2.circle(annotated_img, found_coords, 10, (0, 0, 255), -1) # Red dot at click
+            cv2.putText(annotated_img, "CLICK", (found_coords[0] + 15, found_coords[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+            
+        VisionUtils.save_annotated_image(annotated_img, image_path, "_pet_region.png")
+        log.debug(f"[Pet OCR] Saved debug images to {roi_path}, {mask_path}, and _pet_region.png")
+        
+    return found_coords
+
+def test_lower_middle_ocr(image_path, logger_instance=None):
+    # Deprecated in favor of detect_pet_button_with_mask
+    return detect_pet_button_with_mask(image_path, logger_instance)
 
 def detect_super_troop_at_pixel(image_path, cx, cy, st_rgb_list, logger_instance=None):
     log = logger_instance if logger_instance else logger
