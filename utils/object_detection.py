@@ -94,6 +94,35 @@ def annotate_coords_on_image(image_path, coords, box_size=10, color=(0, 255, 255
         VisionUtils.draw_region(annotated_img, (x - half, y - half, x + half, y + half), color)
     return VisionUtils.save_annotated_image(annotated_img, image_path, output_suffix)
 
+def detect_reload_screen(image_path):
+    """
+    Detects if the reload game modal is visible by checking if the central region is predominantly black.
+    """
+    img_cv = VisionUtils.load_image(image_path)
+    if img_cv is None:
+        return False
+    
+    region = config["HomeBaseCoordinates"].get("reload_screen_region")
+    if not region:
+        logger.warning("Reload screen region not found in config.")
+        return False
+    
+    b, g, r = VisionUtils.get_average_color(img_cv, region)
+    avg_rgb = (r, g, b)
+    
+    target_black = config["Colors"].get("reload_screen_black_rgb", [40, 40, 40])
+    
+    logger.debug(f"[Reload Check] Avg RGB: {avg_rgb} | Target Max: {target_black}")
+    
+    # Check if all channels are below the target (i.e., dark enough)
+    is_black = (r <= target_black[0]) and (g <= target_black[1]) and (b <= target_black[2])
+    
+    annotated_img = img_cv.copy()
+    VisionUtils.draw_region(annotated_img, region, (0, 255, 0) if is_black else (0, 0, 255))
+    VisionUtils.save_annotated_image(annotated_img, image_path, "_reload_check.png")
+    
+    return is_black
+
 """ ----------------------------- Home Base Functions ----------------------------- """
 
 def extract_resources_from_image(image_path):

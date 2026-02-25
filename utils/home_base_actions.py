@@ -624,6 +624,7 @@ class HomeBaseActions(BaseActions):
         Starts an attack using the specified army key from self.attack_armies.
         :param army_key: String key for the army type (e.g., 'e_drag_rage_goblin').
         """
+        self.check_reload_needed()
         self.reset_select()
         # if ranked mode, increment ranked game count
         if ranked_mode and self.ranked_game_count < 10:

@@ -25,3 +25,6 @@ input_tools/data/logs/*
 input_tools/data/screenshots/*
 input_tools/config.toml
 input_tools/list_windows.py
+
+utils/data/logs/*
+utils/data/screenshots/*

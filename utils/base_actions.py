@@ -5,11 +5,16 @@ from datetime import datetime
 
 import cv2
 
-from utils.object_detection import annotate_coords_on_image, detect_word_in_region
+from utils.object_detection import (
+    annotate_coords_on_image,
+    detect_reload_screen,
+    detect_word_in_region,
+)
 from utils.vision_utils import VisionUtils
 
 
 class BaseActions:
+    _global_attack_count = 0
     def __init__(self, window_controller, config, logger):
         self.window_controller = window_controller
         self.config = config
@@ -166,3 +171,27 @@ class BaseActions:
             return True
         
         return False
+
+    def check_reload_needed(self):
+        """
+        Increments global attack count and checks for reload screen every 10 attacks.
+        """
+        BaseActions._global_attack_count += 1
+        self.logger.info(f"Attack counter: {BaseActions._global_attack_count}")
+        
+        if BaseActions._global_attack_count % 10 == 0:
+            self.logger.info("Checking for reload screen (every 10 attacks)...")
+            screenshot_path = self.manage_screenshot_storage('reload_check')
+            self.window_controller.capture_minimized_window_screenshot(screenshot_path)
+            
+            if detect_reload_screen(screenshot_path):
+                self.logger.info("Reload screen detected! Clicking reload...")
+                reload_pos = self.config["HomeBaseCoordinates"].get("reload_screen_button_pos")
+                if reload_pos:
+                    self.window_controller.execute_clicks(reload_pos)
+                    self.logger.info("Waiting 40s for game to reload...")
+                    time.sleep(40)
+                else:
+                    self.logger.warning("Reload screen button position not found in config.")
+            else:
+                self.logger.debug("Reload screen not detected.")
