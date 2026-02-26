@@ -133,10 +133,12 @@ class HomeBaseActions(BaseActions):
         self.reset_select()
         self.window_controller.scroll_wheel_down(20)
         time.sleep(3)
-        end_pos = self.reset_camera_positions[-1]
-        self.reset_camera_positions.pop(-1)
         
-        self.window_controller.execute_clicks(self.reset_camera_positions)
+        # Avoid mutating the list in-place
+        clicks = self.reset_camera_positions[:-1]
+        end_pos = self.reset_camera_positions[-1]
+        
+        self.window_controller.execute_clicks(clicks)
         time.sleep(1.5)
         self.wait_for_base_load()
         self.window_controller.execute_clicks(end_pos)

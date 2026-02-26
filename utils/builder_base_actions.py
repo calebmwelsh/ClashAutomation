@@ -112,7 +112,6 @@ class BuilderBaseActions(BaseActions):
         # Read positions from the file (now from memory)
         positions = self.resource_positions
         # Execute clicks for each position
-        self.logger.info("Executing resource collection...")
         self.window_controller.execute_clicks(positions)
         # claim defense reward
         self.window_controller.execute_clicks(self.claim_defense_reward_positions)

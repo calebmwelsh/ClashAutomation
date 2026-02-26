@@ -1,3 +1,4 @@
+import copy
 import os
 from datetime import datetime
 
@@ -43,7 +44,7 @@ class ClashBase:
         try:
             # Use the already loaded and scaled config from settings as the base
             if settings.config:
-                 defaults = settings.config.copy()
+                 defaults = copy.deepcopy(settings.config)
             else:
                  self.logger.warning("Settings config is empty, loading from disk (unscaled)")
                  current_dir = os.path.dirname(os.path.abspath(__file__))
