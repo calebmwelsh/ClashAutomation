@@ -84,7 +84,3 @@ python main.py
 Contributions are welcome! If you find a bug or have a suggestion for improvement, feel free to open an issue or submit a pull request.
 
 ---
-
-ClashAutomation
-
-An experimental automation framework for Clash of Clans that manages multiple accounts and base progression using vision-based detection. Designed for Windows via Google Play Games Beta, the system uses a flexible coordinate system and OCR for robust UI interaction. 
