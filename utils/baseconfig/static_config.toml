@@ -4,7 +4,7 @@ reference_height = 1080
 
 [HomeBaseGeneral]
 special_troop_event = 1
-special_troop_event_rgb = [ [ 242, 222, 182,],]
+special_troop_event_rgb = [ [ 115, 96, 225,],]
 special_troop_drop = [ [ 0.221065, 0.275926,],]
 special_troop_counts = [ 8,]
 
@@ -65,8 +65,8 @@ max_wall_message_region = [ 0.244792, 0.264815, 0.36169, 0.305556,]
 default_pet_button_pos = [ 0.546296, 0.807407,]
 ranked_mode_offset = [ 0.173611, 0.0,]
 special_troop_select_dummy = [ 0.0, 0.87963,]
-reload_screen_region = [ 0.294213, 0.4, 0.705787, 0.590741 ]
-reload_screen_button_pos = [ [ 0.334491, 0.565741 ], ]
+reload_screen_region = [ 0.294213, 0.4, 0.705787, 0.590741,]
+reload_screen_button_pos = [ [ 0.334491, 0.565741,],]
 
 [BuilderBaseCoordinates]
 gold_warning_exit_click = [ 0.981481, 0.365741,]
@@ -93,7 +93,7 @@ max_wall_msg_green_rgb = [ 124, 131, 68,]
 return_home_avg_rgb = [ 173, 204, 119,]
 check_color_target_1_rgb = [ 203, 171, 159,]
 check_color_target_2_rgb = [ 204, 200, 189,]
-reload_screen_black_rgb = [ 40, 40, 40 ]
+reload_screen_black_rgb = [ 40, 40, 40,]
 
 [ObjectDetectionCoordinates]
 base_determination_check_pos = [ 0.965856, 0.137963,]
