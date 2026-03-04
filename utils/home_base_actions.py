@@ -369,12 +369,12 @@ class HomeBaseActions(BaseActions):
                         # Case A: Start -> Inject into Troops (List 0)
                         # Shifts Everything (Troops, CC, Heroes, Spells)
                         army_positions_copy[0] = placeholders + army_positions_copy[0]
-                        self.logger.debug(f"Injected {num_super} Special Troop sequences (Select + 10 Drops) into Troops (Start).")
+                        self.logger.debug(f"Injected {num_super} Special Troop sequences ({self.special_troop_counts[:num_super]} drops) into Troops (Start).")
                     else:
                         # Case B: End of Troops category
                         # This places them AFTER other troops but BEFORE CC/Heroes/Spells
                         army_positions_copy[0] = army_positions_copy[0] + placeholders
-                        self.logger.debug(f"Injected {num_super} Special Troop sequences (Select + 10 Drops) into End of Troops phase.")
+                        self.logger.debug(f"Injected {num_super} Special Troop sequences ({self.special_troop_counts[:num_super]} drops) into End of Troops phase.")
 
                 # -----------------------------
                 # --- HERO EXPANSION LOGIC ---
