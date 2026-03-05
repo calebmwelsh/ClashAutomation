@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 
@@ -94,18 +95,61 @@ def main():
             
             # Upscale the ROI by 4x for better OCR recognition
             roi_img_up = cv2.resize(roi_img, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
+            
+            # --- 2. Advanced Preprocessing for OCR ---
+            # Grayscale
+            gray = cv2.cvtColor(roi_img_up, cv2.COLOR_BGR2GRAY)
+            
+            # Method A: Binary Inverted ( isolates white text on blue as black text on white)
+            # Use Otsu's or a high fixed threshold
+            _, thresh_white = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+            
+            # Method B: Canny Edge Detection (as requested by user)
+            # Find edges of the white text with black outline
+            edges = cv2.Canny(gray, 50, 150)
+            # Invert so edges are black on white (better for Tesseract)
+            edges_inverted = cv2.bitwise_not(edges)
+            
+            # Save debug images
             cv2.imwrite(count_snippet_path, roi_img_up)
-            logger.info(f"Saved count ROI debug image to: {count_snippet_path}")
+            cv2.imwrite(count_snippet_path.replace(".png", "_thresh.png"), thresh_white)
+            cv2.imwrite(count_snippet_path.replace(".png", "_edges.png"), edges_inverted)
+            logger.info(f"Saved count detection debug images to: {count_snippet_path}")
             
-            text = pytesseract.image_to_string(roi_img_up, config='--psm 7 -c tessedit_char_whitelist=x0123456789')
-            numbers = VisionUtils.extract_numbers(text)
-            logger.info(f"Detected Special Troop Text: {repr(text.strip())}")
-            logger.info(f"Detected Special Troop Count: {numbers}")
+            # OCR Configuration
+            # --psm 7: Treat the image as a single text line.
+            ocr_config = '--psm 7 -c tessedit_char_whitelist=xX0123456789'
             
-            troop_count = None
-            if numbers:
-                troop_count = int(numbers[0])
-                logger.info(f"Detected Special Troop Count: {troop_count}")
+            # Try OCR on both processed versions
+            text_thresh = pytesseract.image_to_string(thresh_white, config=ocr_config).strip()
+            text_edges = pytesseract.image_to_string(edges_inverted, config=ocr_config).strip()
+            
+            logger.info(f"Detected Text (Thresh): {repr(text_thresh)}")
+            logger.info(f"Detected Text (Edges): {repr(text_edges)}")
+            
+            # --- 3. Refined Extraction Logic ---
+            def refined_extract_count(raw_text):
+                # Clean up common OCR artifacts
+                text_clean = raw_text.lower().replace(" ", "")
+                # Match 'x' followed by one or more digits
+                match = re.search(r'x(\d+)', text_clean)
+                if match:
+                    return int(match.group(1))
+                
+                # Fallback: Extract any digits present
+                nums = VisionUtils.extract_numbers(raw_text)
+                if nums:
+                    return int(nums[0])
+                return None
+
+            count_t = refined_extract_count(text_thresh)
+            count_e = refined_extract_count(text_edges)
+            
+            # Final decision: prefer thresh, then edges
+            troop_count = count_t if count_t is not None else count_e
+            
+            if troop_count is not None:
+                logger.info(f"Final Detected Special Troop Count: {troop_count}")
             else:
                 logger.warning("Failed to detect Special Troop Count from tile.")
         except Exception as e:
