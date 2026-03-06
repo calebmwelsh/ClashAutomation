@@ -3,7 +3,7 @@ reference_width = 1728
 reference_height = 1080
 
 [HomeBaseGeneral]
-special_troop_event = 1
+special_troop_event = 0
 special_troop_event_rgb = [ [ 225, 218, 193,],]
 special_troop_drop = [ [ 0.221065, 0.275926,],]
 special_troop_counts = [ 6,]
