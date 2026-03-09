@@ -4,6 +4,7 @@ import sys
 import time
 
 import cv2
+import numpy as np
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,7 +15,6 @@ import toml
 from utils.game_window_controller import GameWindowController
 from utils.object_detection import detect_first_army_tile
 from utils.settings import config, logger, static_config_path
-from utils.vision_utils import VisionUtils
 
 
 def main():
@@ -39,8 +39,6 @@ def main():
     wc.execute_clicks(start_attack_positions)
     
     # Wait for the attack screen (army bar) to be visible. 
-    # home_base_actions waits 8 seconds + find_enemy_base time.
-    # We just need to be on an enemy base.
     logger.info("Waiting 10 seconds for game to load enemy base...")
     time.sleep(10)
 
@@ -48,7 +46,6 @@ def main():
 
     # Capture
     timestamp = time.strftime("%Y%m%d_%H%M%S")
-    # Save to standard data folder
     screenshot_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'screenshots', 'Special Troop Color Test', f'{timestamp}.png')
     
     # Ensure dir exists
@@ -64,169 +61,156 @@ def main():
         return
 
     # --- 1. Tile Detection ---
-    # detect_first_army_tile handles ROI and adaptive scaling automatically
     tile_data = detect_first_army_tile(screenshot_path)
     
     if tile_data:
-        # Unpack (cx, cy, std_rect, candidates)
-        cx, cy, std_rect, candidates = tile_data
+        cx, cy, std_rect, candidates_info = tile_data
         logger.info(f"Detected First Army Tile at: ({cx}, {cy})")
         x, y = int(cx), int(cy)
         
-        # Logging for sync verification
-        logger.info(f"Using tile center for color sampling: ({x}, {y})")
-
-        # Extract troop count from top right of the tile
+        # --- 2. Phase 2 OCR Preprocessing ---
         try:
             std_x, std_y, std_w, std_h = std_rect
-            # Top right corner of the tile
-            roi_x1 = std_x + int(std_w * 0.5)
+            # Widened ROI: Start 40% from the left instead of 50%
+            roi_x1 = std_x + int(std_w * 0.4)
             roi_y1 = std_y
             roi_x2 = std_x + std_w
-            roi_y2 = std_y + int(std_h * 0.25)
-            count_roi = (roi_x1, roi_y1, roi_x2, roi_y2)
+            roi_y2 = std_y + int(std_h * 0.26)
             
-            # Draw region for debugging
-            cv2.rectangle(img, (roi_x1, roi_y1), (roi_x2, roi_y2), (255, 0, 0), 2)
-            
-            # Save a debug snippet of just the count ROI to verify the area
-            count_snippet_path = screenshot_path.replace(".png", "_count_roi.png")
             roi_img = img[roi_y1:roi_y2, roi_x1:roi_x2]
-            
-            # Upscale the ROI by 4x for better OCR recognition
-            roi_img_up = cv2.resize(roi_img, None, fx=4, fy=4, interpolation=cv2.INTER_CUBIC)
-            
-            # --- 2. Advanced Preprocessing for OCR ---
-            # Grayscale
-            gray = cv2.cvtColor(roi_img_up, cv2.COLOR_BGR2GRAY)
-            
-            # Method A: Binary Inverted ( isolates white text on blue as black text on white)
-            # Use Otsu's or a high fixed threshold
-            _, thresh_white = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
-            
-            # Method B: Canny Edge Detection (as requested by user)
-            # Find edges of the white text with black outline
-            edges = cv2.Canny(gray, 50, 150)
-            # Invert so edges are black on white (better for Tesseract)
-            edges_inverted = cv2.bitwise_not(edges)
-            
-            # Save debug images
-            cv2.imwrite(count_snippet_path, roi_img_up)
-            cv2.imwrite(count_snippet_path.replace(".png", "_thresh.png"), thresh_white)
-            cv2.imwrite(count_snippet_path.replace(".png", "_edges.png"), edges_inverted)
-            logger.info(f"Saved count detection debug images to: {count_snippet_path}")
-            
-            # OCR Configuration
-            # --psm 7: Treat the image as a single text line.
-            ocr_config = '--psm 7 -c tessedit_char_whitelist=xX0123456789'
-            
-            # Try OCR on both processed versions
-            text_thresh = pytesseract.image_to_string(thresh_white, config=ocr_config).strip()
-            text_edges = pytesseract.image_to_string(edges_inverted, config=ocr_config).strip()
-            
-            logger.info(f"Detected Text (Thresh): {repr(text_thresh)}")
-            logger.info(f"Detected Text (Edges): {repr(text_edges)}")
-            
-            # --- 3. Refined Extraction Logic ---
-            def refined_extract_count(raw_text):
-                # Clean up common OCR artifacts
-                text_clean = raw_text.lower().replace(" ", "")
-                # Match 'x' followed by one or more digits
-                match = re.search(r'x(\d+)', text_clean)
-                if match:
-                    return int(match.group(1))
-                
-                # Fallback: Extract any digits present
-                nums = VisionUtils.extract_numbers(raw_text)
-                if nums:
-                    return int(nums[0])
-                return None
+            if roi_img.size == 0:
+                raise ValueError("Extracted ROI is empty")
 
-            count_t = refined_extract_count(text_thresh)
-            count_e = refined_extract_count(text_edges)
+            # Create variants of the image for OCR
+            proc_variants = [] # List of (name, image)
             
-            # Final decision: prefer thresh, then edges
-            troop_count = count_t if count_t is not None else count_e
+            # Scales: 3x and 4x
+            for scale in [3, 4]:
+                upscaled = cv2.resize(roi_img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+                gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+                
+                # Variant 1: Global Threshold (200) - Cleanest for high contrast
+                _, t200 = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+                proc_variants.append((f"{scale}x_Thresh200", cv2.copyMakeBorder(t200, 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=255)))
+                
+                # Variant 2: Global Threshold (150) - Lower for thinner characters
+                _, t150 = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY_INV)
+                proc_variants.append((f"{scale}x_Thresh150", cv2.copyMakeBorder(t150, 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=255)))
+                
+                # Variant 3: Adaptive Thresholding
+                adaptive = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 11, 2)
+                proc_variants.append((f"{scale}x_Adaptive", cv2.copyMakeBorder(adaptive, 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=255)))
+
+            # Save diagnostic images for the 4x variant
+            count_snippet_path = screenshot_path.replace(".png", "_count_roi.png")
+            cv2.imwrite(count_snippet_path, roi_img)
+            # Find the 4x Thresh200 for debug visualization
+            for name, pimg in proc_variants:
+                if name == "4x_Thresh200":
+                    cv2.imwrite(count_snippet_path.replace(".png", "_thresh.png"), pimg)
+                    break
             
-            if troop_count is not None:
-                logger.info(f"Final Detected Special Troop Count: {troop_count}")
+            # --- 3. Phase 2 Robust Candidate Selection ---
+            psm_modes = ['7', '6', '11', '8', '3']
+            found_candidates = [] # List of (priority, count, psm, variant)
+            
+            for psm in psm_modes:
+                ocr_config = f'--psm {psm}'
+                for name, pimg in proc_variants:
+                    try:
+                        raw_text = pytesseract.image_to_string(pimg, config=ocr_config).strip()
+                        if not raw_text: continue
+                        
+                        logger.debug(f"OCR Try (PSM {psm}, {name}): {repr(raw_text)}")
+                        
+                        # Normalize text
+                        text_clean = raw_text.lower().replace(" ", "")
+                        
+                        # 1. Match 'x' followed by digits (Priority 2)
+                        match = re.search(r'x(\d+)', text_clean)
+                        if match:
+                            count = int(match.group(1))
+                            found_candidates.append((2, count, psm, name))
+                            continue
+                        
+                        # Handle common '1' misreadings
+                        text_mapped = text_clean.replace('|', '1').replace('i', '1').replace('l', '1').replace('!', '1').replace('[', '1').replace(']', '1')
+                        
+                        # 2. Match digits only (Priority 1)
+                        digits = "".join(re.findall(r'\d+', text_mapped))
+                        if digits and len(digits) <= 3:
+                            count = int(digits)
+                            found_candidates.append((1, count, psm, name))
+                    except Exception:
+                        pass
+            
+            if found_candidates:
+                # ELECTION:
+                # 1. Sort by Priority (x-prefix is better)
+                # 2. Sort by Count (11 is better than 1 if both found)
+                found_candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
+                best = found_candidates[0]
+                troop_count = best[1]
+                logger.info(f"Selected Count '{troop_count}' (Priority {best[0]}, Count {best[1]}) from PSM {best[2]} on {best[3]}")
+                logger.debug(f"All OCR Candidates: {found_candidates}")
             else:
-                logger.warning("Failed to detect Special Troop Count from tile.")
+                troop_count = None
+                logger.warning("No troop count candidates found across all OCR modes.")
+
         except Exception as e:
-            logger.error(f"Error extracting troop count: {e}")
+            logger.error(f"Error in OCR Processing: {e}")
             troop_count = None
 
     else:
-        # Fallback: Try to use a scaled fallback based on Resolution
+        # Fallback Logic
         h_img, w_img = img.shape[:2]
-        
-        # Use config-based "RecordAttackCoordinates" if available for better sync
         st_fallback = config.get("RecordAttackCoordinates", {}).get("special_troop_check_pos", [0.115, 0.916])
-        x = int(st_fallback[0] * w_img)
-        y = int(st_fallback[1] * h_img)
-        
-        logger.warning(f"First Army Tile NOT detected. Using fallback coordinates from config: ({x}, {y})")
+        if st_fallback[0] > 1.0:
+            x, y = int(st_fallback[0]), int(st_fallback[1])
+        else:
+            x = int(st_fallback[0] * w_img)
+            y = int(st_fallback[1] * h_img)
+        logger.warning(f"Tile NOT detected. Using fallback: ({x}, {y})")
+        troop_count = None
     
-    # --- 2. Color Extraction ---
+    # --- 4. Config and Annotation ---
     if 0 <= y < img.shape[0] and 0 <= x < img.shape[1]:
-        # BGR from OpenCV
         b, g, r = img[y, x]
         new_rgb = [int(r), int(g), int(b)]
-        logger.info(f"\n[RESULT] Sampled Pixel at ({x}, {y})")
-        logger.info(f"RGB: {new_rgb}")
+        logger.info(f"\n[RESULT] Sampled Pixel at ({x}, {y}) RGB: {new_rgb}")
         
-        # Automatic Config Update
         try:
             if os.path.exists(static_config_path):
                 config_data = toml.load(static_config_path)
+                if "HomeBaseGeneral" not in config_data: config_data["HomeBaseGeneral"] = {}
                 
-                # Ensure the section exists
-                if "HomeBaseGeneral" not in config_data:
-                    config_data["HomeBaseGeneral"] = {}
-                
-                # Update the RGB values
                 config_data["HomeBaseGeneral"]["special_troop_event_rgb"] = [new_rgb]
                 
-                # Update special troop counts if detected
-                if 'troop_count' in locals() and troop_count is not None:
+                if troop_count is not None:
                     counts = config_data["HomeBaseGeneral"].get("special_troop_counts", [0])
-                    if not isinstance(counts, list):
-                        counts = [counts]
+                    if not isinstance(counts, list): counts = [counts]
                     counts[0] = troop_count
                     config_data["HomeBaseGeneral"]["special_troop_counts"] = counts
                 
                 with open(static_config_path, "w") as f:
                     toml.dump(config_data, f)
-                
-                logger.info(f"Successfully updated 'special_troop_event_rgb' in {static_config_path} with {new_rgb}")
-                if 'troop_count' in locals() and troop_count is not None:
-                    logger.info(f"Successfully updated 'special_troop_counts' with {counts}")
-            else:
-                logger.error(f"Could not find static_config.toml at {static_config_path}")
+                logger.info(f"Updated {static_config_path}")
         except Exception as e:
-            logger.error(f"Failed to update config file: {e}")
+            logger.error(f"Config Update Failed: {e}")
         
-        # Annotate
-        # Use a distinctive Green circle for the exactly sampled pixel
+        # Annotation
         cv2.circle(img, (x, y), 8, (0, 255, 0), 2)
-        cv2.circle(img, (x, y), 1, (0, 255, 0), -1) # Center dot
-        cv2.putText(img, f"SAMPLED RGB: {new_rgb}", (x + 15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
-        
+        cv2.putText(img, f"RGB: {new_rgb} Count: {troop_count}", (x + 15, y), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
         annotated_path = screenshot_path.replace(".png", "_annotated.png")
         cv2.imwrite(annotated_path, img)
-        logger.info(f"Annotated image saved to: {annotated_path}")
-        logger.info("Please open the annotated image to verify the circle is on the special troop icon.")
+        logger.info(f"Annotated: {annotated_path}")
     else:
-        logger.error("Coordinates out of bounds.")
+        logger.error("Out of bounds.")
 
     # Exit Battle
-    logger.info("\nExiting battle...")
+    logger.info("Exiting battle...")
     end_battle_positions = config.get("HomeBaseStaticClickPositions", {}).get("end_battle", [])
-    if end_battle_positions:
-        wc.execute_clicks(end_battle_positions)
-        logger.info("Clicked End Battle.")
-    else:
-        logger.error("Error: 'end_battle' positions not found in config.")
+    if end_battle_positions: wc.execute_clicks(end_battle_positions)
 
 if __name__ == "__main__":
     main()

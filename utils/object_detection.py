@@ -846,16 +846,24 @@ def detect_first_army_tile(image_path):
             # Full screenshot: Select bottom 25% (Bottom Bar Area)
             roi_top = int(h_img * 0.75)
             roi = img_cv[roi_top:h_img, 0:w_img]
-        
+            
         # --- 1. Edge Detection (Canny method) ---
         gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
+        edges = cv2.Canny(blurred, 40, 120)
         
+        # --- Edge Bridging (Vertical Only) ---
+        # The first tile often rests flush against the left screen boundary.
+        # This means, in the Canny mask, the left vertical edge of its square outline will be missing (open).
+        # We manually draw a solid white line of pixels down the extreme left edge AND bottom edge of the Canny edge map
+        # to seal the contour and allow findContours to see it as a perfect enclosed rectangle.
+        cv2.line(edges, (0, 0), (0, edges.shape[0]), 255, 3) # Left seal
+        cv2.line(edges, (0, edges.shape[0]-1), (edges.shape[1], edges.shape[0]-1), 255, 3) # Bottom seal
+
         # Debug: Save edges
         cv2.imwrite(image_path.replace('.png', '_debug_canny_edges.png'), edges)
         
-        # --- 2. Find Contours ---
+        # --- 2. Contour Extraction ---
         contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
         # --- SCALING LOGIC ---
@@ -875,8 +883,13 @@ def detect_first_army_tile(image_path):
         min_w = int(w_img * tile_cfg["min_w"])
         max_w = int(w_img * tile_cfg["max_w"])
         
+        
         min_h = int(simulated_h * tile_cfg["min_h"])
         max_h = int(simulated_h * tile_cfg["max_h"])
+        
+        # We explicitly allow a slightly smaller minimum width just for the leftmost candidates.
+        relaxed_min_w = int(min_w * 0.8) 
+        relaxed_min_h = int(min_h * 0.70) # Reduced to accommodate slightly clipped tops/bottoms
         
         min_y_pos = int(simulated_h * tile_cfg["min_y_pos"])
         
@@ -893,7 +906,8 @@ def detect_first_army_tile(image_path):
             x, y, rw, rh = cv2.boundingRect(cnt)
             
             # Check dimensions using SCALED thresholds
-            size_ok = (min_w <= rw <= max_w) and (min_h <= rh <= max_h)
+            # Use the relaxed_min_w to account for the first tile's clipped edge
+            size_ok = (relaxed_min_w <= rw <= max_w) and (relaxed_min_h <= rh <= max_h)
             
             # Check Position (Y coordinate)
             # If the image is already a crop (e.g. bottom bar only), skip position check but still calculate global_y for debugging
@@ -907,7 +921,6 @@ def detect_first_army_tile(image_path):
             
             if size_ok and pos_ok:
                 # Valid Tile Candidate
-                # logger.debug(f"Contour {i} VALID: x={x}, y={y}, global_y={global_y_check}, w={rw}, h={rh}")
                 valid_candidates.append({
                     'index': i,
                     'cnt': cnt,
@@ -917,12 +930,19 @@ def detect_first_army_tile(image_path):
                 # VISUALIZATION
                 cv2.rectangle(annotated_img, (x, y), (x + rw, y + rh), (0, 255, 0), 2)
                 cv2.putText(annotated_img, f"OK {rw}x{rh}", (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-
             else:
                 # Log rejection for debugging if it's somewhat close in size
-                if rw > (min_w * 0.5) and rh > (min_h * 0.5):
-                    #  logger.debug(f"Contour {i} REJECTED: x={x}, y={y}, w={rw}, h={rh}")
-                    pass
+                if rw > (min_w * 0.4) and rh > (min_h * 0.4):
+                    # VISUALIZATION - Draw Rejected Contours in Red
+                    cv2.rectangle(annotated_img, (x, y), (x + rw, y + rh), (0, 0, 255), 2)
+                    
+                    fail_reasons = []
+                    if not size_ok: fail_reasons.append(f"Size({rw}x{rh})")
+                    if not pos_ok: fail_reasons.append(f"Pos(y={global_y_check})")
+                    
+                    label = f"REJ {','.join(fail_reasons)}"
+                    cv2.putText(annotated_img, label, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 0, 255), 1)
+                    # logger.debug(f"Contour {i} REJECTED: {label}")
 
         # --- 3. Determine Leftmost ---
         if valid_candidates:
@@ -936,6 +956,14 @@ def detect_first_army_tile(image_path):
             global_y = roi_top + leftmost['y']
             global_w = leftmost['w']
             global_h = leftmost['h']
+            
+            # --- GROW BOX LOGIC ---
+            # If the detected height is significantly smaller than intended target_h
+            # (e.g. only the header was caught), we force it to target_h.
+            # This ensures the center point cy is correctly placed in the middle of where the FULL tile should be.
+            if global_h < (target_h * 0.9):
+                logger.debug(f"[Object Detection] Growing truncated tile height from {global_h} to {target_h}")
+                global_h = target_h
             
             cx = global_x + global_w // 2
             cy = global_y + global_h // 2
@@ -953,15 +981,20 @@ def detect_first_army_tile(image_path):
             # Highlight winner in Magenta
             lx, ly, lw, lh = leftmost['x'], leftmost['y'], leftmost['w'], leftmost['h']
             cv2.rectangle(annotated_img, (lx, ly), (lx + lw, ly + lh), (255, 0, 255), 3)
-            cv2.putText(annotated_img, f"WIN {lw}x{lh}", (lx, ly - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+            cv2.putText(annotated_img, f"WIN {lw}x{lh}", (lx, ly - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
             
-            # Save Debug
-            debug_path = image_path.replace('.png', '_detected_first_tile.png')
-            cv2.imwrite(debug_path, annotated_img)
+            if True: # change this to a config flag if desired
+                debug_path = image_path.replace('.png', '_detected_first_tile.png')
+                cv2.imwrite(debug_path, annotated_img)
             
             return (cx, cy, std_rect, valid_candidates)
             
-        return None
+        else:
+            logger.warning("[Object Detection] No valid army tile candidates found after edge detection.")
+            debug_path = image_path.replace('.png', '_detected_first_tile.png')
+            cv2.imwrite(debug_path, annotated_img)
+            logger.info(f"[Object Detection] Saved rejected contours debug image to: {debug_path}")
+            return None
 
     except Exception as e:
         logger.error(f"Error in detect_first_army_tile: {e}")
