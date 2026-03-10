@@ -3,10 +3,10 @@ reference_width = 1728
 reference_height = 1080
 
 [HomeBaseGeneral]
-special_troop_event = 0
-special_troop_event_rgb = [ [ 209, 207, 120,],]
+special_troop_event = 6
+special_troop_event_rgb = [ [ 115, 109, 255,],]
 special_troop_drop = [ [ 0.221065, 0.275926,],]
-special_troop_counts = [ 11,]
+special_troop_counts = [ 1, 2, 1, 3, 2, 1,]
 
 [General]
 switch_account = [ [ 0.963542, 0.77037,], [ 0.657986, 0.208333,], [ 0.869213, 0.618519,],]

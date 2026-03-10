@@ -254,322 +254,243 @@ class HomeBaseActions(BaseActions):
         """
         # get army positions
         if army_key is None:
-            army_key = self.attack_armies.keys()[0]
+            army_key = list(self.attack_armies.keys())[0] if self.attack_armies else None
         army = self.attack_armies.get(army_key)
         if not army:
             raise ValueError(f"Army key '{army_key}' not found in attack_armies.")
-        
-        # Create a copy of army positions for potential adjustments
-        self.logger.debug(f"Original Army Positions: {army['positions']}")
-        army_positions_copy = copy.deepcopy(army["positions"])
 
-        # --- DEBUG: Snapshot positions BEFORE adjustments ---
+        # --- TROOP CALCULATION ---
+        total_select_count = 0
+        if army_key == 'main_attack':
+            try:
+                positions = army.get("positions", [])
+                if len(positions) >= 4:
+                    counts = []
+                    for i in range(4):
+                        sublist = positions[i]
+                        count = 0
+                        for coord in sublist:
+                            if isinstance(coord, (list, tuple)) and len(coord) == 2:
+                                if coord[1] >= 972: # Threshold for select region
+                                    count += 1
+                        counts.append(count)
+                    
+                    num_heroes = available_heros if isinstance(available_heros, int) else 0
+                    special_count = self.special_troop_event if self.special_troop_event > 0 else 0
+                    total_select_count = counts[0] + counts[1] + (counts[2] * num_heroes) + counts[3] + special_count
+                    
+                    self.logger.info(f"[Calculation] Breakdown: {counts[0]} (Troops) + {counts[1]} (CC) + ({counts[2]} * {num_heroes} Heroes) + {counts[3]} (Spells) + {special_count} (Special)")
+                    self.logger.info(f"[Calculation] Total Troops/Clicks over 0.9: {total_select_count}")
+            except Exception as e:
+                self.logger.error(f"Error in troop calculation: {e}")
+
+        # Create a copy of army positions for potential adjustments
+        army_positions_copy = copy.deepcopy(army["positions"])
+        needs_scroll = total_select_count > 14
+        
+        # --- PHASE 1: INITIAL DETECTION & TROOP DEPLOYMENT ---
         try:
-            # Unified screenshot management for pre-adjust tiles
-            # This creates 'data/screenshots/army_placement_debug_pre_adjust_tiles/'
-            debug_screen_path = self.manage_screenshot_storage('army_placement_debug_pre_adjust_tiles')
+            debug_screen_path = self.manage_screenshot_storage('army_placement_phase_1')
             self.window_controller.capture_minimized_window_screenshot(debug_screen_path)
             
-            # Extract distinct select coords (Y > 900) from the UNADJUSTED copy
-            debug_coords = []
-            def extract_select_coords(obj):
-                found = []
-                if isinstance(obj, (list, tuple)):
-                    if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                        if obj[1] > 900:
-                            found.append(tuple(obj))
-                    else:
-                        for item in obj:
-                            found.extend(extract_select_coords(item))
-                return found
-
-            debug_coords = extract_select_coords(army_positions_copy)
-            # Annotate
-            if debug_coords:
-                annotate_coords_on_image(debug_screen_path, debug_coords, output_suffix='_annotated.png')
-                self.logger.debug(f"Saved pre-adjustment army debug image to {debug_screen_path}")
-                
-            # --- Tile Count & First Tile Detection ---
-            # 1. Detect First Tile
+            # 1. Detect First Tile Anchor
             first_tile_data = detect_first_army_tile(debug_screen_path)
-            
-            if first_tile_data:
-                # Unpack (cx, cy, rect, candidates)
-                cx, cy, ft_rect, candidates = first_tile_data
-                w, h = ft_rect[2], ft_rect[3]
+            if not first_tile_data:
+                self.logger.warning("First Tile NOT Detected in Phase 1.")
+                return 
+
+            cx, cy, ft_rect, _ = first_tile_data
+            w, h = ft_rect[2], ft_rect[3]
+            self.logger.debug(f"Phase 1 Anchor: {cx}, {cy} | W={w}, H={h}")
+
+            # 2. Super Troop Injection
+            num_super = int(self.special_troop_event) if self.special_troop_event else 0
+            if num_super > 0 and len(army_positions_copy) > 0:
+                is_special_start = detect_super_troop_at_pixel(
+                    debug_screen_path, cx, cy,
+                    self.config["HomeBaseGeneral"].get("special_troop_event_rgb", []),
+                    self.logger
+                )
                 
-                self.logger.debug(f"First Tile Detected at: {cx}, {cy} | W={w}, H={h}")
+                st_drop_pos = self.special_troop_drop[0]
+                placeholders = []
+                for i in range(num_super):
+                    clicks = self.special_troop_counts[i] if i < len(self.special_troop_counts) else 10
+                    select_dummy = self.hb_coords.get("special_troop_select_dummy", [0, 950]) 
+                    placeholders.append(select_dummy)
+                    for _ in range(clicks):
+                        placeholders.append(st_drop_pos)
 
-                # --- PROPAGATION LOGIC ---
-                # We will now traverse the army_positions_copy structure (Phases)
-                # and assign calculated coordinates based on the First Tile Anchor.
-                
-                # Anchor Position (Center of First Tile)
-                current_x = cx 
-                current_y = cy
-
-
-                # --- SUPER TROOP INJECTION ---
-                
-                num_super = int(self.special_troop_event) if self.special_troop_event else 0
-                is_special_start = False # Default to End if logic checked
-                
-                if num_super > 0 and len(army_positions_copy) > 0:
-                    self.logger.debug(f"Super Troop Config: {num_super} active. determining position (Start vs End).")
-                    
-                    # DETERMINING POSITION:
-                    is_special_start = detect_super_troop_at_pixel(
-                        debug_screen_path,
-                        cx,
-                        cy,
-                        self.config["HomeBaseGeneral"].get("special_troop_event_rgb", []),
-                        self.logger
-                    )
-
-
-                    # INJECTION LOGIC
-                    # PREPARE INJECTION DATA
-                    # Check if we have a valid Reference Placement (Y < 900) to copy
-                    ref_place = self.hb_coords.get("reference_place_pos", [150, 517]) # Default
-                    
-                    # Scan for valid placement in Troops list just in case
-                    def find_place(obj):
-                        if isinstance(obj, (list, tuple)) and len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                            if obj[1] < 900: return obj
-                        elif isinstance(obj, list):
-                            for item in obj:
-                                res = find_place(item)
-                                if res: return res
-                        return None
-
-                    
-                    found_place = find_place(army_positions_copy[0])
-                    if found_place: ref_place = found_place
-                    
-                    # NEW LOGIC: Use special_troop_drop for placement
-                    # "click that coordinate [ 382, 298] 10 times for each special troop tile"
-                    st_drop_pos = self.special_troop_drop[0] # Expecting [[382, 298]]
-                    
-                    placeholders = []
-                    for i in range(num_super):
-                        # Get count for this special troop index, default to 10 if missing
-                        clicks = self.special_troop_counts[i] if i < len(self.special_troop_counts) else 10
-                        
-                        select_dummy = self.hb_coords.get("special_troop_select_dummy", [0, 950]) 
-                        
-                        seq = [select_dummy]
-                        for _ in range(clicks):
-                            seq.append(st_drop_pos)
-                            
-                        # Add this sequence to the master placeholders list
-                        placeholders.extend(seq)
-
-                    # DETERMINE INJECTION POINT
-                    if is_special_start:
-                        # Case A: Start -> Inject into Troops (List 0)
-                        # Shifts Everything (Troops, CC, Heroes, Spells)
-                        army_positions_copy[0] = placeholders + army_positions_copy[0]
-                        self.logger.debug(f"Injected {num_super} Special Troop sequences ({self.special_troop_counts[:num_super]} drops) into Troops (Start).")
-                    else:
-                        # Case B: End of Troops category
-                        # This places them AFTER other troops but BEFORE CC/Heroes/Spells
-                        army_positions_copy[0] = army_positions_copy[0] + placeholders
-                        self.logger.debug(f"Injected {num_super} Special Troop sequences ({self.special_troop_counts[:num_super]} drops) into End of Troops phase.")
-
-                # -----------------------------
-                # --- HERO EXPANSION LOGIC ---
-                # User Request: "make sure there are the number of heroes based on the counter... not necessarily the coordinate itself."
-                # We need to ensure army_positions_copy[2] (Heroes) has enough slots for 'available_heros'.
-                
-                if len(army_positions_copy) > 2:
-                    # Determine target count
-                    target_hero_count = 4 # Default
-                    if isinstance(available_heros, int):
-                        target_hero_count = available_heros
-                    elif isinstance(available_heros, list):
-                        target_hero_count = len(available_heros)
-                    
-                    if target_hero_count == 0:
-                        self.logger.debug(f"Target hero count is 0. Clearing hero slots.")
-                        army_positions_copy[2] = []
-                    
-                    elif target_hero_count > 0:
-                        hero_list = army_positions_copy[2]
-                        # Count existing selection slots (Y > 900)
-                        existing_hero_selects = []
-                        def scan_hero_selects(obj):
-                            if isinstance(obj, (list, tuple)):
-                                if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                                    if obj[1] > 900: existing_hero_selects.append(obj)
-                                else:
-                                    for item in obj: scan_hero_selects(item)
-                        scan_hero_selects(hero_list)
-                        
-                        current_count = len(existing_hero_selects)
-                        
-                        if current_count < target_hero_count and current_count > 0:
-                            self.logger.debug(f"Expanding Hero slots from {current_count} to {target_hero_count}.")
-                            # We need to add (target - current) more slots.
-                            # We will replicate the FIRST slot structure we can find.
-                            # Assuming standard structure: [[Select, Place], [Select, Place]...] OR [[Select, Place]]
-                            
-                            needed = target_hero_count - current_count
-                            
-                            # Simple assumption: The hero_list itself is a list of [Select, Place] pairs.
-                            # Or it's a list containing them.
-                            # If we just duplicate the content of the list, we might duplicate placement logic too.
-                            
-                            # Strategy: Verify structure and replicate the [Select, Place] unit.
-                            # We assume the hero_list is a flat list of coordinates [S, P, S, P...] or a list of pairs [[S,P], [S,P]].
-                            # Vision propagation flattens things sometimes, but let's check structure.
-                            
-                            # Check if the first two items form a valid [Select, Place] pair
-                            # Select: y > 900, Place: y < 900 (usually)
-                            # Or just assume stride of 2.
-                            
-                            if len(hero_list) >= 2:
-                                # We assume a stride of 2 for (Select, Place)
-                                template_unit = hero_list[0:2] # Copy first two items
-                                # Deep copy the template
-                                
-                                for _ in range(needed):
-                                    hero_list.extend(copy.deepcopy(template_unit))
-                                    
-                                self.logger.debug(f"Expanded hero list. New length: {len(hero_list)} (Expected {target_hero_count * 2})")
-                                    
-                # -----------------------------
-                
-                # Configurable Gaps
-                GAP_INTRA_CATEGORY = 8   # Pixels between same category tiles
-                # User requested "barrier of 20" after category is done.
-                GAP_INTER_CATEGORY = 24 
-                
-                last_used_category_idx = -1
-                
-                # Iterate phases: [0: Troops, 1: CC, 2: Heroes, 3+: Spells]
-                for phase_idx, phase_list in enumerate(army_positions_copy):
-                    
-                    found_select_in_phase = False
-                    
-                    # We need to update nested coordinates. 
-                    # Helper function to traverse and update SELECT coords (Y > 900)
-                    def update_phase_coords(obj, phase_active_idx):
-                        nonlocal current_x
-                        nonlocal found_select_in_phase
-                        
-                        if isinstance(obj, (list, tuple)):
-                            # Check if it's a coordinate pair [x, y]
-                            if len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                                if obj[1] > 900:
-                                    # This is a Select Coordinate (Slot)
-                                    # Assign the Current Calculated X
-                                    
-                                    # If this is the VERY FIRST tile (Phase 0, First Item),
-                                    # it should match 'cx'. 
-                                    # logic: The loop state 'current_x' *is* the next slot's center.
-                                    # For the very first one, we initialize current_x = cx.
-                                    
-                                    new_coord = [int(current_x), int(current_y)]
-                                    found_select_in_phase = True
-                                    
-                                    # Advance X for the NEXT tile
-                                    current_x += (w + GAP_INTRA_CATEGORY)
-                                    return new_coord
-                                else:
-                                    # Non-select coord (Placement), keep as is
-                                    return [obj[0], obj[1]]
-                            else:
-                                # Recursively update
-                                return [update_phase_coords(item, phase_active_idx) for item in obj]
-                        return obj
-
-                    # Update the phase in place
-                    army_positions_copy[phase_idx] = update_phase_coords(phase_list, phase_idx)
-                    
-                    # After finishing a Phase, if it contained tiles, we apply the INTER-CATEGORY gap
-                    # Note: We already added INTRA_CATEGORY gap after the last tile.
-                    # So we need to adjustments:
-                    if found_select_in_phase:
-                        # We stepped forward by (W+8) after the last item.
-                        # We want that last step to have been (W+GAP_INTER).
-                        # So add difference.
-                        current_x += (GAP_INTER_CATEGORY - GAP_INTRA_CATEGORY)
-                
-
-                self.logger.debug("Coordinates propagated successfully based on First Tile detection.")
-                
-            else:
-                self.logger.warning("First Tile NOT Detected. Using Config Coordinates with Normalization.")
-
-            # -----------------------------------------------
-            
-            
-            # --- VISUALIZATION of the Final Plan ---
-            save_inferred_army_plan_visualization(debug_screen_path, army_positions_copy, w, h, self.logger)
-            # -----------------------------------------------
-            
-        except Exception as e:
-            self.logger.error(f"Failed to create pre-adjustment debug screenshot: {e}")
-            
-            
-        if len(army_positions_copy) >= 4 and not army_key == 'auto_lose':
-
-
-            troops_pos = army_positions_copy[0]
-            cc_pos = army_positions_copy[1]
-            heroes_pos = army_positions_copy[2]
-            spells_pos = army_positions_copy[3]
-            
-            self.logger.debug(f"Troops Positions: {troops_pos}")
-            self.logger.debug(f"CC Positions: {cc_pos}")
-            self.logger.debug(f"Heroes Positions: {heroes_pos}")
-            self.logger.debug(f"Spells Positions: {spells_pos}")
-            # 1. Troops
-            self.window_controller.execute_clicks(troops_pos, delay=delay)
-            
-            # 2. Clan Castle
-            self.window_controller.execute_clicks(cc_pos, delay=delay)
-
-            # 3. Heroes
-            if not army_key == 'auto_lose':
-                # Determine how many heroes we actually have positions for
-                # Assuming stride of 2 [Select, Place]
-                num_pairs = len(heroes_pos) // 2
-                
-                if num_pairs > 0:
-                    # 2 passes: 1st for deployment, 2nd for ability activation
-                    # Pass 1: Deployment
-                    self.logger.info("Deploying Heroes...")
-                    for i in range(num_pairs):
-                        idx = i * 2
-                        select_pos = heroes_pos[idx]
-                        place_pos = heroes_pos[idx+1]
-                        
-                        self.window_controller.execute_clicks([select_pos], delay=delay)
-                        self.window_controller.execute_clicks([place_pos], delay=delay)
-                        
-                    time.sleep(3) # Wait before activation
-                    
-                    # Pass 2: Ability Activation
-                    self.logger.info("Activating Hero Abilities...")
-                    for i in range(num_pairs):
-                        idx = i * 2
-                        select_pos = heroes_pos[idx]
-                        # Click select again to activate
-                        self.window_controller.execute_clicks([select_pos], delay=delay)
-                        # No need to place again
+                if is_special_start:
+                    army_positions_copy[0] = placeholders + army_positions_copy[0]
                 else:
-                    self.logger.warning("No hero positions available to execute.")
+                    army_positions_copy[0] = army_positions_copy[0] + placeholders
 
-            # 4. Spells (and any extra phases)
-            for idx, spells_list in enumerate(spells_pos):
+            # 3. Hero Expansion
+            if len(army_positions_copy) > 2:
+                target_hero_count = available_heros if isinstance(available_heros, int) else 4
+                if target_hero_count == 0:
+                    army_positions_copy[2] = []
+                elif target_hero_count > 0:
+                    hero_list = army_positions_copy[2]
+                    existing_hero_selects = [c for c in hero_list if isinstance(c, list) and len(c)==2 and c[1] > 900]
+                    current_count = len(existing_hero_selects)
+                    if current_count < target_hero_count and current_count > 0 and len(hero_list) >= 2:
+                        needed = target_hero_count - current_count
+                        template_unit = hero_list[0:2]
+                        for _ in range(needed):
+                            hero_list.extend(copy.deepcopy(template_unit))
+
+            # 4. Propagate Coordinates for PHASE 1
+            GAP_INTRA = 8
+            GAP_INTER = 24
+            
+            def propagate(phases, start_x, start_y):
+                curr_x = start_x
+                for p_idx, p_list in enumerate(phases):
+                    found_select = False
+                    def update_coords(obj):
+                        nonlocal curr_x, found_select
+                        if isinstance(obj, list) and len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
+                            if obj[1] > 900:
+                                new_c = [int(curr_x), int(start_y)]
+                                curr_x += (w + GAP_INTRA)
+                                found_select = True
+                                return new_c
+                            return [obj[0], obj[1]]
+                        elif isinstance(obj, list):
+                            return [update_coords(item) for item in obj]
+                        return obj
+                    phases[p_idx] = update_coords(p_list)
+                    if found_select:
+                        curr_x += (GAP_INTER - GAP_INTRA)
+                return phases
+
+            # We propagate everything initially to have a plan
+            army_positions_copy = propagate(army_positions_copy, cx, cy)
+            
+            # --- EXECUTION PHASE 1 ---
+            self.logger.info("Executing Phase 1 (Troops)...")
+            self.window_controller.execute_clicks(army_positions_copy[0], delay=delay)
+
+            if not needs_scroll:
+                # Normal execution for CC, Heroes, Spells
+                self.logger.info("Executing Remaining Phases (Single Pass)...")
+                # CC
+                self.window_controller.execute_clicks(army_positions_copy[1], delay=delay)
+                # Heroes (Double Pass)
+                self._deploy_and_activate_heroes(army_positions_copy[2], delay)
+                # Spells
+                for spell_list in army_positions_copy[3:]:
+                    self.window_controller.execute_clicks(spell_list, delay=delay)
+            else:
+                # --- SCROLL MANEUVER ---
+                self.logger.info("[Scroll] Over 14 tiles detected. Scrolling bar...")
+                # Start: (0.9497, 0.9259) -> [1641, 1000] | End: (0.0347, 0.9259) -> [60, 1000]
+                scroll_start = [1641, 1000]
+                scroll_end = [60, 1000]
+                self.window_controller.drag_in_window(scroll_start[0], scroll_start[1], scroll_end[0], scroll_end[1])
+                time.sleep(1.5)
+
+                # --- PHASE 2: RE-DETECTION & BACKWARDS ALIGNMENT ---
+                debug_screen_2 = self.manage_screenshot_storage('army_placement_phase_2')
+                self.window_controller.capture_minimized_window_screenshot(debug_screen_2)
                 
-                # Annotate spell positions for debugging
+                # Detect ALL tiles. valid_candidates[0] is leftmost, [-1] is rightmost.
+                tile_results = detect_first_army_tile(debug_screen_2)
+                if not tile_results:
+                    self.logger.warning("No tiles detected in Phase 2! Falling back to leftmost assumption.")
+                    nx, ny = cx, cy # Bad fallback but avoids crash
+                else:
+                    cx2, cy2, _, candidates = tile_results
+                    rightmost = candidates[-1]
+                    rx, ry = rightmost['x'] + rightmost['w']//2, cy2 # Use rightmost center
+                    
+                    self.logger.info(f"[Scroll] Phase 2 Rightmost Anchor: {rx}, {ry}")
+                    
+                    # --- BACKWARDS OFFSET CALCULATION ---
+                    GAP_INTRA = 8
+                    GAP_INTER = 24
+                    
+                    def get_select_count(obj):
+                        cnt = 0
+                        if isinstance(obj, list) and len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
+                            if obj[1] >= 972: return 1
+                        elif isinstance(obj, list):
+                            for item in obj: cnt += get_select_count(item)
+                        return cnt
 
-                self.window_controller.execute_clicks(spells_list, delay=delay)
-                time.sleep(1)
+                    # Calculate tiles per phase for the remaining army
+                    p1_tiles = get_select_count(army_positions_copy[1])
+                    p2_tiles = get_select_count(army_positions_copy[2])
+                    p3_tiles = 0
+                    for sub in army_positions_copy[3:]:
+                        p3_tiles += get_select_count(sub)
+                    
+                    # Distance from center of first tile to center of last tile
+                    # Every tile adds (w + GAP_INTRA), except categories add (GAP_INTER - GAP_INTRA) extra
+                    total_tiles = p1_tiles + p2_tiles + p3_tiles
+                    if total_tiles <= 0:
+                        nx, ny = rx, ry
+                    else:
+                        total_width = (total_tiles - 1) * (w + GAP_INTRA)
+                        # Add INTER gap bonuses (16 pixels each)
+                        if p1_tiles > 0 and (p2_tiles > 0 or p3_tiles > 0):
+                            total_width += (GAP_INTER - GAP_INTRA)
+                        if p2_tiles > 0 and p3_tiles > 0:
+                            total_width += (GAP_INTER - GAP_INTRA)
+                        
+                        nx = rx - total_width
+                        ny = ry
+                    
+                    self.logger.info(f"[Scroll] Phase 2 Tiles: CC={p1_tiles}, Heroes={p2_tiles}, Spells={p3_tiles} | Total Width: {total_width}")
+                    self.logger.info(f"[Scroll] Calculated Start-X for Phase 2: {nx} (Backwards from {rx})")
+                    
+                    # Re-propagate remaining phases (1, 2, 3+)
+                    original_remaining = copy.deepcopy(army["positions"][1:])
+                    # Re-expand heroes in the original copy
+                    if len(original_remaining) > 1 and num_heroes > 0:
+                        h_list = original_remaining[1]
+                        if len(h_list) >= 2:
+                            # Use same logic to find how many template blocks to add
+                            current_cfg_selects = get_select_count(h_list)
+                            needed = num_heroes - current_cfg_selects
+                            if needed > 0:
+                                template = h_list[0:2]
+                                for _ in range(needed):
+                                    h_list.extend(copy.deepcopy(template))
+
+                    army_positions_copy[1:] = propagate(original_remaining, nx, ny)
+
+                self.logger.info("Executing Remaining Phases (Post-Scroll)...")
+                # CC
+                self.window_controller.execute_clicks(army_positions_copy[1], delay=delay)
+                # Heroes
+                self._deploy_and_activate_heroes(army_positions_copy[2], delay)
+                # Spells
+                for spell_list in army_positions_copy[3:]:
+                    self.window_controller.execute_clicks(spell_list, delay=delay)
 
             self.logger.info("Attack finished")
+
+        except Exception as e:
+            self.logger.error(f"Failed in army_placement: {e}")
+            import traceback
+            self.logger.error(traceback.format_exc())
+
+    def _deploy_and_activate_heroes(self, heroes_pos, delay):
+        """Helper to handle hero deployment and ability activation."""
+        num_pairs = len(heroes_pos) // 2
+        if num_pairs > 0:
+            self.logger.info("Deploying Heroes...")
+            for i in range(num_pairs):
+                idx = i * 2
+                self.window_controller.execute_clicks([heroes_pos[idx]], delay=delay)
+                self.window_controller.execute_clicks([heroes_pos[idx+1]], delay=delay)
+            time.sleep(3)
+            self.logger.info("Activating Hero Abilities...")
+            for i in range(num_pairs):
+                self.window_controller.execute_clicks([heroes_pos[i * 2]], delay=delay)
 
         
         
