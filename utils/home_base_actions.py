@@ -271,7 +271,7 @@ class HomeBaseActions(BaseActions):
                         count = 0
                         for coord in sublist:
                             if isinstance(coord, (list, tuple)) and len(coord) == 2:
-                                if coord[1] >= 972: # Threshold for select region
+                                if coord[1] >= 918: # Threshold for select region (0.85)
                                     count += 1
                         counts.append(count)
                     
@@ -280,7 +280,7 @@ class HomeBaseActions(BaseActions):
                     total_select_count = counts[0] + counts[1] + (counts[2] * num_heroes) + counts[3] + special_count
                     
                     self.logger.info(f"[Calculation] Breakdown: {counts[0]} (Troops) + {counts[1]} (CC) + ({counts[2]} * {num_heroes} Heroes) + {counts[3]} (Spells) + {special_count} (Special)")
-                    self.logger.info(f"[Calculation] Total Troops/Clicks over 0.9: {total_select_count}")
+                    self.logger.info(f"[Calculation] Total Troops/Clicks over 0.85: {total_select_count}")
             except Exception as e:
                 self.logger.error(f"Error in troop calculation: {e}")
 
@@ -333,7 +333,7 @@ class HomeBaseActions(BaseActions):
                     army_positions_copy[2] = []
                 elif target_hero_count > 0:
                     hero_list = army_positions_copy[2]
-                    existing_hero_selects = [c for c in hero_list if isinstance(c, list) and len(c)==2 and c[1] > 900]
+                    existing_hero_selects = [c for c in hero_list if isinstance(c, list) and len(c)==2 and c[1] >= 918]
                     current_count = len(existing_hero_selects)
                     if current_count < target_hero_count and current_count > 0 and len(hero_list) >= 2:
                         needed = target_hero_count - current_count
@@ -352,7 +352,7 @@ class HomeBaseActions(BaseActions):
                     def update_coords(obj):
                         nonlocal curr_x, found_select
                         if isinstance(obj, list) and len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                            if obj[1] > 900:
+                            if obj[1] >= 918:
                                 new_c = [int(curr_x), int(start_y)]
                                 curr_x += (w + GAP_INTRA)
                                 found_select = True
@@ -415,7 +415,7 @@ class HomeBaseActions(BaseActions):
                     def get_select_count(obj):
                         cnt = 0
                         if isinstance(obj, list) and len(obj) == 2 and all(isinstance(x, (int, float)) for x in obj):
-                            if obj[1] >= 972: return 1
+                            if obj[1] >= 918: return 1
                         elif isinstance(obj, list):
                             for item in obj: cnt += get_select_count(item)
                         return cnt
