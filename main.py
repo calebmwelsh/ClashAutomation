@@ -66,7 +66,7 @@ def main():
         logger.info("Clash of Clans not found, starting programs...")
         logger.info("Starting Google Play Games...")
         program_controller.start_program(GP_FILEPATH)
-        time.sleep(10)
+        time.sleep(20)
         
         logger.info("Starting Clash of Clans...")
         program_controller.start_program(COC_FILEPATH)
